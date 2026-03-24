@@ -1,0 +1,944 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>STL Flash Viewer — BMF S130 Print Orientation</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #1a1a2e;
+    --panel: #16213e;
+    --accent: #0f3460;
+    --highlight: #e94560;
+    --text: #eee;
+    --text-dim: #999;
+    --flash-color: #ff6b35;
+  }
+
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  header {
+    background: var(--panel);
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    border-bottom: 1px solid var(--accent);
+    flex-shrink: 0;
+  }
+
+  header h1 {
+    font-size: 18px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  header h1 span { color: var(--highlight); }
+
+  .header-controls {
+    display: flex;
+    gap: 10px;
+    margin-left: auto;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .header-controls label {
+    font-size: 13px;
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .header-controls input[type="range"] {
+    width: 100px;
+    accent-color: var(--highlight);
+  }
+
+  .header-controls .value-display {
+    min-width: 36px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    color: var(--text);
+    font-size: 13px;
+  }
+
+  button {
+    background: var(--accent);
+    color: var(--text);
+    border: 1px solid rgba(255,255,255,0.1);
+    padding: 6px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: background 0.15s;
+  }
+  button:hover { background: var(--highlight); }
+  button:disabled { opacity: 0.4; cursor: default; }
+
+  .main-area {
+    flex: 1;
+    display: flex;
+    position: relative;
+    overflow: hidden;
+  }
+
+  #viewport {
+    flex: 1;
+    position: relative;
+  }
+
+  #viewport canvas { display: block; }
+
+  /* Drop zone overlay */
+  #dropzone {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: rgba(26, 26, 46, 0.95);
+    z-index: 10;
+    transition: opacity 0.3s;
+  }
+
+  #dropzone.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  #dropzone.dragover {
+    background: rgba(15, 52, 96, 0.95);
+  }
+
+  .drop-icon {
+    width: 100px;
+    height: 100px;
+    border: 3px dashed var(--text-dim);
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 40px;
+    margin-bottom: 20px;
+    transition: border-color 0.2s;
+  }
+
+  #dropzone.dragover .drop-icon {
+    border-color: var(--highlight);
+  }
+
+  #dropzone h2 {
+    font-size: 22px;
+    margin-bottom: 8px;
+  }
+
+  #dropzone p {
+    color: var(--text-dim);
+    font-size: 14px;
+    margin-bottom: 16px;
+  }
+
+  #file-input { display: none; }
+
+  .browse-btn {
+    background: var(--highlight);
+    padding: 10px 24px;
+    border-radius: 8px;
+    font-size: 15px;
+    border: none;
+  }
+
+  /* Side panel */
+  .side-panel {
+    width: 280px;
+    background: var(--panel);
+    border-left: 1px solid var(--accent);
+    padding: 16px;
+    overflow-y: auto;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .panel-section h3 {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-dim);
+    margin-bottom: 8px;
+  }
+
+  .axis-btn-group {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+
+  .axis-btn {
+    padding: 10px;
+    text-align: center;
+    font-size: 13px;
+    border-radius: 6px;
+    transition: all 0.15s;
+  }
+
+  .axis-btn.active {
+    background: var(--highlight);
+    border-color: var(--highlight);
+  }
+
+  .info-box {
+    background: rgba(255,255,255,0.04);
+    border-radius: 8px;
+    padding: 12px;
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--text-dim);
+  }
+
+  .info-box strong { color: var(--text); }
+
+  .legend {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+  }
+
+  .legend-swatch {
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+    flex-shrink: 0;
+  }
+
+  .dimensions {
+    font-size: 13px;
+    line-height: 1.8;
+  }
+
+  .dimensions .dim-label { color: var(--text-dim); }
+  .dimensions .dim-value { color: var(--text); font-variant-numeric: tabular-nums; }
+
+  /* Toast */
+  #toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: var(--accent);
+    color: var(--text);
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 14px;
+    opacity: 0;
+    transition: all 0.3s;
+    z-index: 100;
+    pointer-events: none;
+  }
+
+  #toast.show {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+  }
+
+  /* Platform indicator */
+  .platform-label {
+    position: absolute;
+    bottom: 16px;
+    right: 16px;
+    background: rgba(0,0,0,0.6);
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    color: var(--text-dim);
+    z-index: 5;
+    pointer-events: none;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>STL <span>Flash</span> Viewer</h1>
+  <div class="header-controls" id="controls" style="display:none">
+    <label>
+      Squish
+      <input type="range" id="squish-slider" min="0" max="10" step="0.5" value="3">
+      <span class="value-display" id="squish-value">3%</span>
+    </label>
+    <label>
+      Flash width
+      <input type="range" id="flash-slider" min="0" max="2" step="0.05" value="0.5">
+      <span class="value-display" id="flash-value">0.50mm</span>
+    </label>
+    <label>
+      Flash height
+      <input type="range" id="flash-height-slider" min="0.01" max="0.3" step="0.01" value="0.08">
+      <span class="value-display" id="flash-height-value">0.08mm</span>
+    </label>
+    <button id="reset-btn">Reset View</button>
+  </div>
+</header>
+
+<div class="main-area">
+  <div id="viewport">
+    <div id="dropzone">
+      <div class="drop-icon">&#128230;</div>
+      <h2>Drop your STL file here</h2>
+      <p>or click to browse</p>
+      <button class="browse-btn" onclick="document.getElementById('file-input').click()">
+        Choose STL File
+      </button>
+      <input type="file" id="file-input" accept=".stl">
+    </div>
+    <div class="platform-label" id="platform-label" style="display:none">
+      BMF S130 — Build platform shown in blue
+    </div>
+  </div>
+
+  <div class="side-panel" id="side-panel" style="display:none">
+    <div class="panel-section">
+      <h3>Select Base Direction</h3>
+      <p style="font-size:12px;color:var(--text-dim);margin-bottom:8px">
+        Choose which face sits on the print platform:
+      </p>
+      <div class="axis-btn-group">
+        <button class="axis-btn" data-axis="+y">Top (+Y)</button>
+        <button class="axis-btn" data-axis="-y">Bottom (-Y)</button>
+        <button class="axis-btn" data-axis="+x">Right (+X)</button>
+        <button class="axis-btn" data-axis="-x">Left (-X)</button>
+        <button class="axis-btn" data-axis="+z">Front (+Z)</button>
+        <button class="axis-btn" data-axis="-z">Back (-Z)</button>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <h3>Or Click a Face</h3>
+      <p style="font-size:12px;color:var(--text-dim)">
+        Click on any face of the model to set it as the base. The clicked face's normal will become the down direction.
+      </p>
+    </div>
+
+    <div class="panel-section" id="dims-section" style="display:none">
+      <h3>Part Dimensions</h3>
+      <div class="dimensions" id="dimensions"></div>
+    </div>
+
+    <div class="panel-section">
+      <h3>Legend</h3>
+      <div class="legend">
+        <div class="legend-item">
+          <div class="legend-swatch" style="background:#b0bec5"></div>
+          Original part
+        </div>
+        <div class="legend-item">
+          <div class="legend-swatch" style="background:rgba(233,69,96,0.5)"></div>
+          Squished shape
+        </div>
+        <div class="legend-item">
+          <div class="legend-swatch" style="background:#ff6b35"></div>
+          Flash / flashing
+        </div>
+        <div class="legend-item">
+          <div class="legend-swatch" style="background:rgba(70,130,220,0.3)"></div>
+          Build platform
+        </div>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <h3>About</h3>
+      <div class="info-box">
+        <strong>What is flashing?</strong><br>
+        When printing on the BMF S130, the first few layers adhere to the build platform. This causes a thin
+        "flash" of cured resin to spread slightly beyond the part's intended footprint at the base.
+        The part may also be compressed ~1-5% in the build direction due to platform adhesion forces.
+        <br><br>
+        Use this tool to choose a print orientation where critical dimensions are <strong>not</strong> in
+        the build direction, avoiding squish and flash on important surfaces.
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.170.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.170.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { STLLoader } from 'three/addons/loaders/STLLoader.js';
+
+// ─── State ───────────────────────────────────────────────────────────
+let scene, camera, renderer, controls;
+let originalGeometry = null;   // BufferGeometry from STL
+let originalMesh = null;       // wireframe/ghost of original
+let squishMesh = null;         // the squished version
+let flashMesh = null;          // flashing geometry
+let platformMesh = null;       // build platform plane
+let arrowHelper = null;        // shows build direction
+let baseNormal = new THREE.Vector3(0, -1, 0); // default: bottom face is base
+let modelGroup = new THREE.Group();
+let boundingSize = 1;
+
+const loader = new STLLoader();
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+
+// ─── Init Three.js ───────────────────────────────────────────────────
+function init() {
+  const container = document.getElementById('viewport');
+
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x1a1a2e);
+
+  camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.01, 1000);
+  camera.position.set(3, 3, 3);
+
+  renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(window.devicePixelRatio);
+  renderer.setSize(container.clientWidth, container.clientHeight);
+  renderer.shadowMap.enabled = true;
+  container.appendChild(renderer.domElement);
+
+  controls = new OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.08;
+
+  // Lights
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+  scene.add(ambientLight);
+
+  const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
+  dirLight.position.set(5, 10, 7);
+  dirLight.castShadow = true;
+  scene.add(dirLight);
+
+  const dirLight2 = new THREE.DirectionalLight(0xffffff, 0.3);
+  dirLight2.position.set(-5, 3, -5);
+  scene.add(dirLight2);
+
+  scene.add(modelGroup);
+
+  // Grid
+  const gridHelper = new THREE.GridHelper(20, 40, 0x333355, 0x222244);
+  scene.add(gridHelper);
+
+  window.addEventListener('resize', onResize);
+  renderer.domElement.addEventListener('click', onCanvasClick);
+
+  animate();
+}
+
+function onResize() {
+  const container = document.getElementById('viewport');
+  camera.aspect = container.clientWidth / container.clientHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(container.clientWidth, container.clientHeight);
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+// ─── File Loading ────────────────────────────────────────────────────
+function loadSTL(arrayBuffer) {
+  const geometry = loader.parse(arrayBuffer);
+  geometry.computeVertexNormals();
+  geometry.computeBoundingBox();
+
+  originalGeometry = geometry;
+
+  // Center geometry
+  const center = new THREE.Vector3();
+  geometry.boundingBox.getCenter(center);
+  geometry.translate(-center.x, -center.y, -center.z);
+  geometry.computeBoundingBox();
+
+  // Compute bounding size for scaling UI elements
+  const box = geometry.boundingBox;
+  const size = new THREE.Vector3();
+  box.getSize(size);
+  boundingSize = Math.max(size.x, size.y, size.z);
+
+  // Fit camera
+  const dist = boundingSize * 2.2;
+  camera.position.set(dist * 0.7, dist * 0.6, dist * 0.9);
+  controls.target.set(0, 0, 0);
+  controls.update();
+
+  // Show UI
+  document.getElementById('dropzone').classList.add('hidden');
+  document.getElementById('controls').style.display = 'flex';
+  document.getElementById('side-panel').style.display = 'flex';
+  document.getElementById('platform-label').style.display = 'block';
+
+  // Show dimensions
+  showDimensions(size);
+
+  // Default base: -Y
+  baseNormal.set(0, -1, 0);
+  setActiveAxisButton('-y');
+  rebuildVisualization();
+  toast('STL loaded! Select a base direction or click a face.');
+}
+
+function showDimensions(size) {
+  const el = document.getElementById('dimensions');
+  const section = document.getElementById('dims-section');
+  section.style.display = 'block';
+  el.innerHTML = `
+    <span class="dim-label">X:</span> <span class="dim-value">${size.x.toFixed(3)} mm</span><br>
+    <span class="dim-label">Y:</span> <span class="dim-value">${size.y.toFixed(3)} mm</span><br>
+    <span class="dim-label">Z:</span> <span class="dim-value">${size.z.toFixed(3)} mm</span>
+  `;
+}
+
+// ─── Visualization ───────────────────────────────────────────────────
+function rebuildVisualization() {
+  // Clear previous
+  while (modelGroup.children.length) modelGroup.remove(modelGroup.children[0]);
+
+  if (!originalGeometry) return;
+
+  const squishPct = parseFloat(document.getElementById('squish-slider').value) / 100;
+  const flashWidth = parseFloat(document.getElementById('flash-slider').value);
+  const flashHeight = parseFloat(document.getElementById('flash-height-slider').value);
+
+  // The base normal points "down" (toward platform). Build direction is opposite.
+  const buildDir = baseNormal.clone().negate(); // direction away from platform
+
+  // We need a rotation that maps baseNormal to -Y (so the base sits on the XZ plane)
+  const targetDown = new THREE.Vector3(0, -1, 0);
+  const rotationQuat = new THREE.Quaternion().setFromUnitVectors(baseNormal, targetDown);
+
+  // ── Original mesh (ghost wireframe) ──
+  const origMat = new THREE.MeshPhysicalMaterial({
+    color: 0xb0bec5,
+    transparent: true,
+    opacity: 0.25,
+    wireframe: false,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+  });
+  originalMesh = new THREE.Mesh(originalGeometry.clone(), origMat);
+  originalMesh.quaternion.copy(rotationQuat);
+
+  // Shift so base sits on Y=0
+  const tempBox = new THREE.Box3().setFromObject(originalMesh);
+  originalMesh.position.y -= tempBox.min.y;
+  modelGroup.add(originalMesh);
+
+  // ── Squished mesh ──
+  const squishGeo = originalGeometry.clone();
+  // Apply rotation to geometry directly for squish computation
+  squishGeo.applyQuaternion(rotationQuat);
+  squishGeo.computeBoundingBox();
+  const squishBoxMin = squishGeo.boundingBox.min.y;
+
+  // Squish: compress in Y
+  const posAttr = squishGeo.getAttribute('position');
+  const positions = posAttr.array;
+  const squishBox = squishGeo.boundingBox;
+  const height = squishBox.max.y - squishBox.min.y;
+
+  for (let i = 0; i < positions.length; i += 3) {
+    const y = positions[i + 1];
+    // Linear compression toward the base
+    const t = (y - squishBox.min.y) / height; // 0 at base, 1 at top
+    positions[i + 1] = squishBox.min.y + t * height * (1 - squishPct);
+  }
+  posAttr.needsUpdate = true;
+  squishGeo.computeVertexNormals();
+  squishGeo.computeBoundingBox();
+
+  const squishMat = new THREE.MeshPhysicalMaterial({
+    color: 0xe94560,
+    transparent: true,
+    opacity: 0.5,
+    side: THREE.DoubleSide,
+    roughness: 0.4,
+    metalness: 0.1,
+  });
+  squishMesh = new THREE.Mesh(squishGeo, squishMat);
+  // Shift so base sits on Y=0
+  squishMesh.position.y -= squishGeo.boundingBox.min.y;
+  modelGroup.add(squishMesh);
+
+  // ── Flash geometry ──
+  buildFlashGeometry(squishGeo, flashWidth, flashHeight);
+
+  // ── Build platform ──
+  const platSize = boundingSize * 2;
+  const platGeo = new THREE.BoxGeometry(platSize, 0.02 * boundingSize, platSize);
+  const platMat = new THREE.MeshPhysicalMaterial({
+    color: 0x4682dc,
+    transparent: true,
+    opacity: 0.3,
+    roughness: 0.8,
+  });
+  platformMesh = new THREE.Mesh(platGeo, platMat);
+  platformMesh.position.y = -0.01 * boundingSize;
+  modelGroup.add(platformMesh);
+
+  // ── Arrow showing build direction ──
+  const arrowOrigin = new THREE.Vector3(
+    0,
+    (squishGeo.boundingBox.max.y - squishGeo.boundingBox.min.y) + squishMesh.position.y + boundingSize * 0.3,
+    0
+  );
+  arrowHelper = new THREE.ArrowHelper(
+    new THREE.Vector3(0, 1, 0),
+    arrowOrigin,
+    boundingSize * 0.4,
+    0x00ff88,
+    boundingSize * 0.08,
+    boundingSize * 0.05
+  );
+  modelGroup.add(arrowHelper);
+}
+
+function buildFlashGeometry(squishGeo, flashWidth, flashHeight) {
+  if (flashWidth <= 0) return;
+
+  // Find base vertices (those near Y = min after rotation)
+  const positions = squishGeo.getAttribute('position').array;
+  const bbox = squishGeo.boundingBox;
+  const baseY = bbox.min.y;
+  const threshold = (bbox.max.y - bbox.min.y) * 0.02 + 0.001; // small tolerance
+
+  // Collect 2D base outline points (XZ plane)
+  const basePoints2D = [];
+  for (let i = 0; i < positions.length; i += 3) {
+    if (Math.abs(positions[i + 1] - baseY) < threshold) {
+      basePoints2D.push(new THREE.Vector2(positions[i], positions[i + 2]));
+    }
+  }
+
+  if (basePoints2D.length < 3) {
+    // Fallback: if too few base vertices, use more generous threshold
+    const bigThreshold = (bbox.max.y - bbox.min.y) * 0.05 + 0.01;
+    for (let i = 0; i < positions.length; i += 3) {
+      if (Math.abs(positions[i + 1] - baseY) < bigThreshold) {
+        basePoints2D.push(new THREE.Vector2(positions[i], positions[i + 2]));
+      }
+    }
+  }
+
+  if (basePoints2D.length < 3) return;
+
+  // Compute 2D convex hull of base
+  const hull = convexHull2D(basePoints2D);
+  if (hull.length < 3) return;
+
+  // Create flash as an extruded ring: outer = hull expanded, inner = hull
+  // Expand hull outward by flashWidth
+  const center2D = new THREE.Vector2(0, 0);
+  for (const p of hull) { center2D.add(p); }
+  center2D.divideScalar(hull.length);
+
+  const outerHull = hull.map(p => {
+    const dir = new THREE.Vector2().subVectors(p, center2D).normalize();
+    return new THREE.Vector2(p.x + dir.x * flashWidth, p.y + dir.y * flashWidth);
+  });
+
+  // Build ring geometry with triangles
+  const flashVerts = [];
+  const n = hull.length;
+
+  for (let i = 0; i < n; i++) {
+    const i2 = (i + 1) % n;
+    const inner1 = hull[i];
+    const inner2 = hull[i2];
+    const outer1 = outerHull[i];
+    const outer2 = outerHull[i2];
+
+    // Top face of flash ring (two triangles per quad)
+    // Triangle 1
+    flashVerts.push(inner1.x, flashHeight, inner1.y);
+    flashVerts.push(outer1.x, flashHeight, outer1.y);
+    flashVerts.push(inner2.x, flashHeight, inner2.y);
+    // Triangle 2
+    flashVerts.push(inner2.x, flashHeight, inner2.y);
+    flashVerts.push(outer1.x, flashHeight, outer1.y);
+    flashVerts.push(outer2.x, flashHeight, outer2.y);
+
+    // Bottom face
+    flashVerts.push(inner1.x, 0, inner1.y);
+    flashVerts.push(inner2.x, 0, inner2.y);
+    flashVerts.push(outer1.x, 0, outer1.y);
+
+    flashVerts.push(inner2.x, 0, inner2.y);
+    flashVerts.push(outer2.x, 0, outer2.y);
+    flashVerts.push(outer1.x, 0, outer1.y);
+
+    // Outer wall
+    flashVerts.push(outer1.x, 0, outer1.y);
+    flashVerts.push(outer2.x, 0, outer2.y);
+    flashVerts.push(outer1.x, flashHeight, outer1.y);
+
+    flashVerts.push(outer2.x, 0, outer2.y);
+    flashVerts.push(outer2.x, flashHeight, outer2.y);
+    flashVerts.push(outer1.x, flashHeight, outer1.y);
+  }
+
+  const flashGeo = new THREE.BufferGeometry();
+  flashGeo.setAttribute('position', new THREE.Float32BufferAttribute(flashVerts, 3));
+  flashGeo.computeVertexNormals();
+
+  const flashMat = new THREE.MeshPhysicalMaterial({
+    color: 0xff6b35,
+    transparent: true,
+    opacity: 0.75,
+    side: THREE.DoubleSide,
+    roughness: 0.6,
+  });
+
+  flashMesh = new THREE.Mesh(flashGeo, flashMat);
+  // Position at the base of squished mesh
+  flashMesh.position.y = -squishGeo.boundingBox.min.y;
+  modelGroup.add(flashMesh);
+}
+
+// ─── Convex Hull (Graham scan) ───────────────────────────────────────
+function convexHull2D(points) {
+  // Remove near-duplicates
+  const eps = 0.0001;
+  const unique = [];
+  for (const p of points) {
+    let dup = false;
+    for (const u of unique) {
+      if (Math.abs(p.x - u.x) < eps && Math.abs(p.y - u.y) < eps) { dup = true; break; }
+    }
+    if (!dup) unique.push(p.clone());
+  }
+
+  if (unique.length < 3) return unique;
+
+  // Find lowest-rightmost point
+  unique.sort((a, b) => a.y - b.y || a.x - b.x);
+  const pivot = unique[0];
+
+  // Sort by polar angle
+  const rest = unique.slice(1);
+  rest.sort((a, b) => {
+    const angleA = Math.atan2(a.y - pivot.y, a.x - pivot.x);
+    const angleB = Math.atan2(b.y - pivot.y, b.x - pivot.x);
+    if (Math.abs(angleA - angleB) < 1e-10) {
+      return a.distanceTo(pivot) - b.distanceTo(pivot);
+    }
+    return angleA - angleB;
+  });
+
+  const stack = [pivot, rest[0]];
+  for (let i = 1; i < rest.length; i++) {
+    while (stack.length > 1 && cross2D(stack[stack.length - 2], stack[stack.length - 1], rest[i]) <= 0) {
+      stack.pop();
+    }
+    stack.push(rest[i]);
+  }
+  return stack;
+}
+
+function cross2D(o, a, b) {
+  return (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+}
+
+// ─── Face Click (Raycasting) ─────────────────────────────────────────
+function onCanvasClick(event) {
+  if (!originalMesh) return;
+
+  const rect = renderer.domElement.getBoundingClientRect();
+  mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+  mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+  raycaster.setFromCamera(mouse, camera);
+
+  // Raycast against the original (ghost) mesh and the squished mesh
+  const targets = [originalMesh, squishMesh].filter(Boolean);
+  const intersects = raycaster.intersectObjects(targets);
+
+  if (intersects.length > 0) {
+    const hit = intersects[0];
+    const faceNormal = hit.face.normal.clone();
+
+    // Transform normal from local mesh space to world space
+    const normalMatrix = new THREE.Matrix3().getNormalMatrix(hit.object.matrixWorld);
+    faceNormal.applyMatrix3(normalMatrix).normalize();
+
+    // The clicked face normal should become the "down" direction (base normal)
+    // We want that face to sit on the platform
+    baseNormal.copy(faceNormal).negate();
+
+    // But we need the base normal in original geometry space (before rotation)
+    // Since originalMesh has rotationQuat applied, we need to undo it
+    // Actually, let's re-derive: the user clicked a face, its world-space normal
+    // indicates the face direction. We want that face pointing down.
+    // So the base normal (in original space) is the original face normal.
+    // Let's get the face normal in original geometry space.
+    const origNormalMatrix = new THREE.Matrix3().getNormalMatrix(originalMesh.matrixWorld);
+    const invNormalMatrix = origNormalMatrix.clone().invert();
+    const origSpaceNormal = faceNormal.clone().applyMatrix3(invNormalMatrix).normalize();
+
+    // The base normal should be this face's direction in original space
+    // But it's simpler: after rotation, the face normal is in world space.
+    // We want to rotate the model so this face points down (-Y).
+    // So baseNormal = the face normal in original geometry coords.
+    // Since originalMesh.quaternion = rotationQuat, and the geometry is the original,
+    // the face normal in original space is: inverse(rotationQuat) * worldNormal
+    const invQuat = originalMesh.quaternion.clone().invert();
+    const originalFaceNormal = faceNormal.clone().applyQuaternion(invQuat).normalize();
+
+    baseNormal.copy(originalFaceNormal);
+
+    clearActiveAxisButtons();
+    rebuildVisualization();
+    toast('Base set from clicked face');
+  }
+}
+
+// ─── UI Wiring ───────────────────────────────────────────────────────
+function setActiveAxisButton(axis) {
+  document.querySelectorAll('.axis-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.axis === axis);
+  });
+}
+
+function clearActiveAxisButtons() {
+  document.querySelectorAll('.axis-btn').forEach(btn => btn.classList.remove('active'));
+}
+
+document.querySelectorAll('.axis-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const axis = btn.dataset.axis;
+    const map = {
+      '+y': new THREE.Vector3(0, 1, 0),
+      '-y': new THREE.Vector3(0, -1, 0),
+      '+x': new THREE.Vector3(1, 0, 0),
+      '-x': new THREE.Vector3(-1, 0, 0),
+      '+z': new THREE.Vector3(0, 0, 1),
+      '-z': new THREE.Vector3(0, 0, -1),
+    };
+    baseNormal.copy(map[axis]);
+    setActiveAxisButton(axis);
+    rebuildVisualization();
+    toast(`Base set to ${btn.textContent.trim()}`);
+  });
+});
+
+// Sliders
+document.getElementById('squish-slider').addEventListener('input', (e) => {
+  document.getElementById('squish-value').textContent = e.target.value + '%';
+  rebuildVisualization();
+});
+
+document.getElementById('flash-slider').addEventListener('input', (e) => {
+  document.getElementById('flash-value').textContent = parseFloat(e.target.value).toFixed(2) + 'mm';
+  rebuildVisualization();
+});
+
+document.getElementById('flash-height-slider').addEventListener('input', (e) => {
+  document.getElementById('flash-height-value').textContent = parseFloat(e.target.value).toFixed(2) + 'mm';
+  rebuildVisualization();
+});
+
+document.getElementById('reset-btn').addEventListener('click', () => {
+  const dist = boundingSize * 2.2;
+  camera.position.set(dist * 0.7, dist * 0.6, dist * 0.9);
+  controls.target.set(0, 0, 0);
+  controls.update();
+});
+
+// Drag and drop
+const dropzone = document.getElementById('dropzone');
+
+['dragenter', 'dragover'].forEach(evt => {
+  dropzone.addEventListener(evt, (e) => {
+    e.preventDefault();
+    dropzone.classList.add('dragover');
+  });
+});
+
+['dragleave', 'drop'].forEach(evt => {
+  dropzone.addEventListener(evt, () => {
+    dropzone.classList.remove('dragover');
+  });
+});
+
+dropzone.addEventListener('drop', (e) => {
+  e.preventDefault();
+  const file = e.dataTransfer.files[0];
+  if (file) handleFile(file);
+});
+
+document.getElementById('file-input').addEventListener('change', (e) => {
+  if (e.target.files[0]) handleFile(e.target.files[0]);
+});
+
+// Also allow drop on viewport after first load
+document.getElementById('viewport').addEventListener('dragover', (e) => e.preventDefault());
+document.getElementById('viewport').addEventListener('drop', (e) => {
+  e.preventDefault();
+  const file = e.dataTransfer.files[0];
+  if (file) {
+    document.getElementById('dropzone').classList.remove('hidden');
+    handleFile(file);
+  }
+});
+
+function handleFile(file) {
+  if (!file.name.toLowerCase().endsWith('.stl')) {
+    toast('Please select an STL file');
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = (e) => loadSTL(e.target.result);
+  reader.readAsArrayBuffer(file);
+}
+
+// Toast notification
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(el._timer);
+  el._timer = setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+// ─── Boot ────────────────────────────────────────────────────────────
+init();
+
+</script>
+</body>
+</html>
