@@ -212,6 +212,16 @@
 
   .info-box strong { color: var(--text); }
 
+  .info-callout {
+    margin-top: 10px;
+    padding: 8px 10px;
+    background: rgba(255,255,255,0.06);
+    border-left: 3px solid var(--highlight);
+    border-radius: 0 6px 6px 0;
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
   .legend {
     display: flex;
     flex-direction: column;
@@ -368,15 +378,63 @@
     </div>
 
     <div class="panel-section">
-      <h3>About</h3>
+      <h3>
+        <span class="legend-swatch" style="background:#ff6b35;display:inline-block;vertical-align:middle;margin-right:6px"></span>
+        What is Flashing?
+      </h3>
       <div class="info-box">
-        <strong>What is flashing?</strong><br>
-        When printing on the BMF S130, the first few layers adhere to the build platform. This causes a thin
-        "flash" of cured resin to spread slightly beyond the part's intended footprint at the base.
-        The part may also be compressed ~1-5% in the build direction due to platform adhesion forces.
+        The BMF S130 uses <strong>Projection Micro Stereolithography (P&mu;SL)</strong> — a UV projector
+        cures liquid resin one layer at a time. The very first layers are printed directly onto the
+        build platform so the part stays anchored during the print.
         <br><br>
-        Use this tool to choose a print orientation where critical dimensions are <strong>not</strong> in
-        the build direction, avoiding squish and flash on important surfaces.
+        At this interface, UV light scatters and reflects off the platform surface, curing resin
+        <strong>slightly beyond</strong> the intended boundary of the part. This creates a thin rim of
+        excess cured material around the base known as <strong>"flash"</strong> or <strong>"flashing"</strong>.
+        <br><br>
+        Flash is typically <strong>0.1 &ndash; 0.5 mm</strong> wide and only a few layers thick.
+        It can usually be removed with light sanding or a blade, but it means the base surface
+        won't have the same clean edge as the rest of the part.
+        <div class="info-callout">
+          <strong>Tip:</strong> Orient your part so the base face is a non-critical surface — avoid
+          putting precision edges, sealing faces, or cosmetic surfaces on the platform side.
+        </div>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <h3>
+        <span class="legend-swatch" style="background:rgba(233,69,96,0.7);display:inline-block;vertical-align:middle;margin-right:6px"></span>
+        What is Squish?
+      </h3>
+      <div class="info-box">
+        To ensure reliable adhesion to the build platform, the first several layers of the print
+        are <strong>slightly over-compressed</strong> against the platform. The projector also
+        applies longer exposure times to these initial layers to ensure they bond.
+        <br><br>
+        This means the part can be <strong>~1 &ndash; 5% shorter</strong> in the build direction
+        (the axis perpendicular to the platform). The effect is most pronounced on shorter parts
+        where the compressed layers make up a larger proportion of the total height.
+        <br><br>
+        The red overlay shows how your part's shape changes compared to the original
+        (shown as the transparent grey ghost).
+        <div class="info-callout">
+          <strong>Tip:</strong> If a dimension is critical, orient the part so that axis runs
+          <em>parallel</em> to the platform — not perpendicular to it. Dimensions in the
+          platform plane (X/Z) are unaffected by squish.
+        </div>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <h3>About the BMF S130</h3>
+      <div class="info-box">
+        The <strong>BMF microArch S130</strong> is a micro-precision 3D printer capable of
+        <strong>2 &mu;m resolution</strong> using P&mu;SL technology. It excels at producing
+        extremely small, high-detail parts in a range of engineering resins.
+        <br><br>
+        Because of the platform adhesion requirements at this scale, flash and squish effects
+        are an inherent part of the process. Use this tool to plan your print orientation
+        so that critical features are preserved.
       </div>
     </div>
   </div>
