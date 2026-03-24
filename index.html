@@ -597,7 +597,9 @@ function rebuildVisualization() {
   modelGroup.add(squishMesh);
 
   // ── Flash geometry ──
-  buildFlashGeometry(squishGeo, flashWidth, flashHeight);
+  // Pass the same Y offset as squishMesh so flash aligns with the base
+  const baseYOffset = -squishGeo.boundingBox.min.y;
+  buildFlashGeometry(squishGeo, flashWidth, flashHeight, baseYOffset);
 
   // ── Build platform ──
   const platSize = boundingSize * 2;
@@ -629,41 +631,42 @@ function rebuildVisualization() {
   modelGroup.add(arrowHelper);
 }
 
-function buildFlashGeometry(squishGeo, flashWidth, flashHeight) {
+function buildFlashGeometry(squishGeo, flashWidth, flashHeight, baseYOffset) {
   if (flashWidth <= 0) return;
 
-  // Find base vertices (those near Y = min after rotation)
+  // Find base vertices (those near Y = min in squishGeo local space)
   const positions = squishGeo.getAttribute('position').array;
   const bbox = squishGeo.boundingBox;
   const baseY = bbox.min.y;
-  const threshold = (bbox.max.y - bbox.min.y) * 0.02 + 0.001; // small tolerance
+  const totalHeight = bbox.max.y - bbox.min.y;
 
-  // Collect 2D base outline points (XZ plane)
-  const basePoints2D = [];
-  for (let i = 0; i < positions.length; i += 3) {
-    if (Math.abs(positions[i + 1] - baseY) < threshold) {
-      basePoints2D.push(new THREE.Vector2(positions[i], positions[i + 2]));
-    }
-  }
+  // Use progressively larger thresholds to ensure we get enough base points
+  let basePoints2D = [];
+  const thresholds = [
+    totalHeight * 0.01 + 0.001,
+    totalHeight * 0.03 + 0.01,
+    totalHeight * 0.08 + 0.05,
+  ];
 
-  if (basePoints2D.length < 3) {
-    // Fallback: if too few base vertices, use more generous threshold
-    const bigThreshold = (bbox.max.y - bbox.min.y) * 0.05 + 0.01;
+  for (const threshold of thresholds) {
+    basePoints2D = [];
     for (let i = 0; i < positions.length; i += 3) {
-      if (Math.abs(positions[i + 1] - baseY) < bigThreshold) {
+      const y = positions[i + 1];
+      // Only look ABOVE baseY (not abs — we want the bottom slice only)
+      if (y - baseY < threshold && y - baseY >= 0) {
         basePoints2D.push(new THREE.Vector2(positions[i], positions[i + 2]));
       }
     }
+    if (basePoints2D.length >= 3) break;
   }
 
   if (basePoints2D.length < 3) return;
 
-  // Compute 2D convex hull of base
+  // Compute 2D convex hull of base footprint
   const hull = convexHull2D(basePoints2D);
   if (hull.length < 3) return;
 
-  // Create flash as an extruded ring: outer = hull expanded, inner = hull
-  // Expand hull outward by flashWidth
+  // Expand hull outward by flashWidth using edge normals
   const center2D = new THREE.Vector2(0, 0);
   for (const p of hull) { center2D.add(p); }
   center2D.divideScalar(hull.length);
@@ -673,9 +676,12 @@ function buildFlashGeometry(squishGeo, flashWidth, flashHeight) {
     return new THREE.Vector2(p.x + dir.x * flashWidth, p.y + dir.y * flashWidth);
   });
 
-  // Build ring geometry with triangles
+  // Build flash ring at the base Y level in squishGeo local space.
+  // This ensures the flash is in the exact same coordinate frame as the squish mesh.
   const flashVerts = [];
   const n = hull.length;
+  const ringBottom = baseY;              // same Y as the base vertices
+  const ringTop = baseY + flashHeight;   // thin layer above base
 
   for (let i = 0; i < n; i++) {
     const i2 = (i + 1) % n;
@@ -684,33 +690,41 @@ function buildFlashGeometry(squishGeo, flashWidth, flashHeight) {
     const outer1 = outerHull[i];
     const outer2 = outerHull[i2];
 
-    // Top face of flash ring (two triangles per quad)
-    // Triangle 1
-    flashVerts.push(inner1.x, flashHeight, inner1.y);
-    flashVerts.push(outer1.x, flashHeight, outer1.y);
-    flashVerts.push(inner2.x, flashHeight, inner2.y);
-    // Triangle 2
-    flashVerts.push(inner2.x, flashHeight, inner2.y);
-    flashVerts.push(outer1.x, flashHeight, outer1.y);
-    flashVerts.push(outer2.x, flashHeight, outer2.y);
+    // Top face of flash ring
+    flashVerts.push(inner1.x, ringTop, inner1.y);
+    flashVerts.push(outer1.x, ringTop, outer1.y);
+    flashVerts.push(inner2.x, ringTop, inner2.y);
+
+    flashVerts.push(inner2.x, ringTop, inner2.y);
+    flashVerts.push(outer1.x, ringTop, outer1.y);
+    flashVerts.push(outer2.x, ringTop, outer2.y);
 
     // Bottom face
-    flashVerts.push(inner1.x, 0, inner1.y);
-    flashVerts.push(inner2.x, 0, inner2.y);
-    flashVerts.push(outer1.x, 0, outer1.y);
+    flashVerts.push(inner1.x, ringBottom, inner1.y);
+    flashVerts.push(inner2.x, ringBottom, inner2.y);
+    flashVerts.push(outer1.x, ringBottom, outer1.y);
 
-    flashVerts.push(inner2.x, 0, inner2.y);
-    flashVerts.push(outer2.x, 0, outer2.y);
-    flashVerts.push(outer1.x, 0, outer1.y);
+    flashVerts.push(inner2.x, ringBottom, inner2.y);
+    flashVerts.push(outer2.x, ringBottom, outer2.y);
+    flashVerts.push(outer1.x, ringBottom, outer1.y);
 
     // Outer wall
-    flashVerts.push(outer1.x, 0, outer1.y);
-    flashVerts.push(outer2.x, 0, outer2.y);
-    flashVerts.push(outer1.x, flashHeight, outer1.y);
+    flashVerts.push(outer1.x, ringBottom, outer1.y);
+    flashVerts.push(outer2.x, ringBottom, outer2.y);
+    flashVerts.push(outer1.x, ringTop, outer1.y);
 
-    flashVerts.push(outer2.x, 0, outer2.y);
-    flashVerts.push(outer2.x, flashHeight, outer2.y);
-    flashVerts.push(outer1.x, flashHeight, outer1.y);
+    flashVerts.push(outer2.x, ringBottom, outer2.y);
+    flashVerts.push(outer2.x, ringTop, outer2.y);
+    flashVerts.push(outer1.x, ringTop, outer1.y);
+
+    // Inner wall (so the ring is visible from inside too)
+    flashVerts.push(inner1.x, ringBottom, inner1.y);
+    flashVerts.push(inner1.x, ringTop, inner1.y);
+    flashVerts.push(inner2.x, ringBottom, inner2.y);
+
+    flashVerts.push(inner2.x, ringBottom, inner2.y);
+    flashVerts.push(inner1.x, ringTop, inner1.y);
+    flashVerts.push(inner2.x, ringTop, inner2.y);
   }
 
   const flashGeo = new THREE.BufferGeometry();
@@ -726,8 +740,9 @@ function buildFlashGeometry(squishGeo, flashWidth, flashHeight) {
   });
 
   flashMesh = new THREE.Mesh(flashGeo, flashMat);
-  // Position at the base of squished mesh
-  flashMesh.position.y = 0; // sit flush on the build platform
+  // Use the SAME Y offset as squishMesh — this guarantees the flash base
+  // lands at world Y=0 (the platform), matching the squish mesh base exactly.
+  flashMesh.position.y = baseYOffset;
   modelGroup.add(flashMesh);
 }
 
