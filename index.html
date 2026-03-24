@@ -727,7 +727,7 @@ function buildFlashGeometry(squishGeo, flashWidth, flashHeight) {
 
   flashMesh = new THREE.Mesh(flashGeo, flashMat);
   // Position at the base of squished mesh
-  flashMesh.position.y = -squishGeo.boundingBox.min.y;
+  flashMesh.position.y = 0; // sit flush on the build platform
   modelGroup.add(flashMesh);
 }
 
