@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>STL Flash Viewer — BMF S130 Print Orientation</title>
+<title>STL Flash Viewer — BMF S140 Print Orientation</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -163,7 +163,7 @@
 
   /* Side panel */
   .side-panel {
-    width: 280px;
+    width: 340px;
     background: var(--panel);
     border-left: 1px solid var(--accent);
     padding: 16px;
@@ -272,6 +272,147 @@
     opacity: 1;
   }
 
+  /* Design Check */
+  .scale-row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+
+  .scale-row select, .scale-row input {
+    background: var(--accent);
+    color: var(--text);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 4px;
+    padding: 4px 6px;
+    font-size: 12px;
+  }
+
+  .scale-row input[type="number"] {
+    width: 70px;
+  }
+
+  .design-check-btn {
+    width: 100%;
+    padding: 10px;
+    background: #2a6b4a;
+    font-size: 13px;
+    font-weight: 600;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 6px;
+    margin-bottom: 8px;
+  }
+  .design-check-btn:hover { background: #38a169; }
+
+  .check-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+  }
+
+  .check-table th {
+    text-align: left;
+    padding: 4px 4px;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    color: var(--text-dim);
+    font-weight: 500;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+
+  .check-table td {
+    padding: 5px 4px;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    vertical-align: top;
+  }
+
+  .check-table tr.status-pass td:first-child { border-left: 3px solid #38a169; padding-left: 6px; }
+  .check-table tr.status-warn td:first-child { border-left: 3px solid #d69e2e; padding-left: 6px; }
+  .check-table tr.status-fail td:first-child { border-left: 3px solid #e53e3e; padding-left: 6px; }
+  .check-table tr.status-info td:first-child { border-left: 3px solid #4a90d9; padding-left: 6px; }
+  .check-table tr.status-na td:first-child { border-left: 3px solid #555; padding-left: 6px; }
+
+  .badge {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+  .badge-pass { background: rgba(56,161,105,0.25); color: #68d391; }
+  .badge-warn { background: rgba(214,158,46,0.25); color: #ecc94b; }
+  .badge-fail { background: rgba(229,62,62,0.25); color: #fc8181; }
+  .badge-info { background: rgba(74,144,217,0.25); color: #90cdf4; }
+  .badge-na   { background: rgba(100,100,100,0.25); color: #999; }
+
+  .check-summary {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+    font-size: 12px;
+  }
+
+  .check-summary .summary-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .check-summary .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+  }
+
+  .printer-specs {
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--text-dim);
+  }
+
+  .printer-specs table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 6px;
+  }
+
+  .printer-specs table th,
+  .printer-specs table td {
+    padding: 3px 6px;
+    text-align: left;
+    font-size: 11px;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+  }
+
+  .printer-specs table th {
+    color: var(--text-dim);
+    font-weight: 500;
+  }
+
+  .overhang-legend {
+    display: flex;
+    gap: 6px;
+    margin-top: 6px;
+    flex-wrap: wrap;
+  }
+
+  .overhang-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+
+  .overhang-legend-item .swatch {
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+  }
+
   /* Platform indicator */
   .platform-label {
     position: absolute;
@@ -323,7 +464,7 @@
       <input type="file" id="file-input" accept=".stl">
     </div>
     <div class="platform-label" id="platform-label" style="display:none">
-      BMF S130 — Build platform shown in blue
+      BMF S140 — Build platform shown in blue
     </div>
   </div>
 
@@ -352,7 +493,37 @@
 
     <div class="panel-section" id="dims-section" style="display:none">
       <h3>Part Dimensions</h3>
+      <div class="scale-row">
+        <label style="font-size:12px;color:var(--text-dim)">Units:</label>
+        <select id="unit-select">
+          <option value="1" selected>mm</option>
+          <option value="0.001">μm</option>
+          <option value="25.4">inches</option>
+          <option value="custom">Custom</option>
+        </select>
+        <input type="number" id="custom-scale" value="1" min="0.0001" step="any"
+               style="display:none" placeholder="Scale to mm">
+        <span style="font-size:11px;color:var(--text-dim)" id="scale-hint"></span>
+      </div>
       <div class="dimensions" id="dimensions"></div>
+    </div>
+
+    <div class="panel-section" id="design-check-section" style="display:none">
+      <h3>Design Rules Check</h3>
+      <button class="design-check-btn" id="run-check-btn">Run Design Check</button>
+      <div id="check-summary" class="check-summary" style="display:none"></div>
+      <div id="check-results"></div>
+      <div class="overhang-legend" id="overhang-legend" style="display:none">
+        <div class="overhang-legend-item">
+          <div class="swatch" style="background:#38a169"></div> Safe (&gt;45°)
+        </div>
+        <div class="overhang-legend-item">
+          <div class="swatch" style="background:#d69e2e"></div> Marginal (30-45°)
+        </div>
+        <div class="overhang-legend-item">
+          <div class="swatch" style="background:#e53e3e"></div> Overhang (&lt;30°)
+        </div>
+      </div>
     </div>
 
     <div class="panel-section">
@@ -426,15 +597,19 @@
     </div>
 
     <div class="panel-section">
-      <h3>About the BMF S130</h3>
-      <div class="info-box">
-        The <strong>BMF microArch S130</strong> is a micro-precision 3D printer capable of
-        <strong>2 &mu;m resolution</strong> using P&mu;SL technology. It excels at producing
-        extremely small, high-detail parts in a range of engineering resins.
-        <br><br>
-        Because of the platform adhesion requirements at this scale, flash and squish effects
-        are an inherent part of the process. Use this tool to plan your print orientation
-        so that critical features are preserved.
+      <h3>BMF S140 Specifications</h3>
+      <div class="info-box printer-specs">
+        The <strong>BMF microArch S140</strong> uses <strong>Projection Micro Stereolithography
+        (P&mu;SL)</strong> with <strong>10 &mu;m pixel size</strong>.
+        <table>
+          <tr><th colspan="2" style="color:var(--text)">Image Resolution</th></tr>
+          <tr><td>Single exposure</td><td>1920 &times; 1080 px (19.2 &times; 10.8 mm)</td></tr>
+          <tr><td>Stitched</td><td>9400 &times; 5200 px (94 &times; 52 mm)</td></tr>
+          <tr><th colspan="2" style="color:var(--text);padding-top:6px">Build Volume</th></tr>
+          <tr><td>X &times; Y &times; Z</td><td><strong>94 &times; 52 &times; 45 mm</strong></td></tr>
+          <tr><th colspan="2" style="color:var(--text);padding-top:6px">Layer Height</th></tr>
+          <tr><td>Range</td><td>10 &ndash; 50 &mu;m</td></tr>
+        </table>
       </div>
     </div>
   </div>
@@ -562,8 +737,12 @@ function loadSTL(arrayBuffer) {
   document.getElementById('side-panel').style.display = 'flex';
   document.getElementById('platform-label').style.display = 'block';
 
-  // Show dimensions
-  showDimensions(size);
+  // Show dimensions (using current scale)
+  const s = getPartScale();
+  showDimensions(new THREE.Vector3(size.x * s, size.y * s, size.z * s));
+
+  // Show design check section
+  document.getElementById('design-check-section').style.display = 'block';
 
   // Default base: -Y
   baseNormal.set(0, -1, 0);
@@ -587,6 +766,7 @@ function showDimensions(size) {
 function rebuildVisualization() {
   // Clear previous
   while (modelGroup.children.length) modelGroup.remove(modelGroup.children[0]);
+  overhangMesh = null; // cleared with the group
 
   if (!originalGeometry) return;
 
@@ -1008,6 +1188,429 @@ function toast(msg) {
   clearTimeout(el._timer);
   el._timer = setTimeout(() => el.classList.remove('show'), 2500);
 }
+
+// ─── Design Rules ─────────────────────────────────────────────────────
+const BMF_RULES = {
+  buildVolume: { x: 94, y: 52, z: 45 },  // mm
+  minVolume: 1,           // mm³ (minimum part size)
+  minFeatureSize: 0.05,   // mm
+  minHoleDiaVert: 0.05,   // mm
+  minHoleDiaHoriz: 0.15,  // mm
+  minWallSupported: 0.05, // mm
+  minWallUnsupported: 0.1,// mm
+  minOverhangAngle: 30,   // degrees
+  maxBridgedOverhang: 1.5,// mm
+  maxUnbridgedOverhang: 0.3, // mm
+  aspectRatioChannels: 100,
+  aspectRatioPins: 40,
+  minFeatureClearance: 0.1, // mm
+  minPartSpacing: 0.1,   // mm
+  layerHeightMin: 0.01,  // mm
+  layerHeightMax: 0.05,  // mm
+  supportConeTopMin: 0.08,  // mm
+  supportConeTopMax: 0.2,   // mm
+  supportConeBaseMin: 0.1,  // mm
+  supportConeBaseMax: 1.0,  // mm
+};
+
+let partScale = 1; // multiplier to convert STL units to mm
+let overhangMesh = null; // colored overhang visualization
+
+function getPartScale() {
+  const sel = document.getElementById('unit-select');
+  if (sel.value === 'custom') {
+    return parseFloat(document.getElementById('custom-scale').value) || 1;
+  }
+  return parseFloat(sel.value);
+}
+
+function getScaledDimensions() {
+  if (!originalGeometry) return null;
+  const box = originalGeometry.boundingBox;
+  const size = new THREE.Vector3();
+  box.getSize(size);
+  const s = getPartScale();
+  return { x: size.x * s, y: size.y * s, z: size.z * s };
+}
+
+// Compute signed volume of a triangle mesh
+function computeMeshVolume(geometry) {
+  const pos = geometry.getAttribute('position').array;
+  let volume = 0;
+  for (let i = 0; i < pos.length; i += 9) {
+    const ax = pos[i],   ay = pos[i+1], az = pos[i+2];
+    const bx = pos[i+3], by = pos[i+4], bz = pos[i+5];
+    const cx = pos[i+6], cy = pos[i+7], cz = pos[i+8];
+    volume += (ax * (by * cz - bz * cy) +
+               bx * (cy * az - cz * ay) +
+               cx * (ay * bz - az * by)) / 6.0;
+  }
+  return Math.abs(volume);
+}
+
+// Estimate minimum wall thickness via ray sampling
+function estimateMinWallThickness(geometry, numSamples) {
+  const pos = geometry.getAttribute('position').array;
+  const totalTris = pos.length / 9;
+  if (totalTris === 0) return Infinity;
+
+  const rc = new THREE.Raycaster();
+  const tempGeo = geometry.clone();
+  const tempMesh = new THREE.Mesh(tempGeo, new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));
+
+  let minThickness = Infinity;
+  const step = Math.max(1, Math.floor(totalTris / numSamples));
+
+  for (let t = 0; t < totalTris; t += step) {
+    const i = t * 9;
+    const a = new THREE.Vector3(pos[i], pos[i+1], pos[i+2]);
+    const b = new THREE.Vector3(pos[i+3], pos[i+4], pos[i+5]);
+    const c = new THREE.Vector3(pos[i+6], pos[i+7], pos[i+8]);
+
+    // Centroid
+    const centroid = new THREE.Vector3().addVectors(a, b).add(c).divideScalar(3);
+
+    // Face normal
+    const ab = new THREE.Vector3().subVectors(b, a);
+    const ac = new THREE.Vector3().subVectors(c, a);
+    const normal = new THREE.Vector3().crossVectors(ab, ac).normalize();
+    if (normal.lengthSq() < 0.001) continue;
+
+    // Cast ray inward (opposite of face normal)
+    const inward = normal.clone().negate();
+    const origin = centroid.clone().addScaledVector(inward, 0.0001); // small offset to avoid self-hit
+    rc.set(origin, inward);
+    rc.far = Infinity;
+
+    const hits = rc.intersectObject(tempMesh);
+    if (hits.length > 0) {
+      const dist = hits[0].distance;
+      if (dist > 0.0001 && dist < minThickness) {
+        minThickness = dist;
+      }
+    }
+  }
+
+  tempGeo.dispose();
+  return minThickness;
+}
+
+// Analyze overhangs — returns per-face angle data and builds colored mesh
+function analyzeOverhangs(geometry, buildDir) {
+  // buildDir points UP (away from platform). Overhangs are faces whose
+  // outward normal has a component pointing downward (opposite to buildDir).
+  const pos = geometry.getAttribute('position').array;
+  const totalTris = pos.length / 9;
+  const colors = new Float32Array(pos.length); // 1 color per vertex
+
+  let overhanging30 = 0; // faces below 30° from horizontal
+  let overhanging45 = 0; // faces 30-45° from horizontal
+  let maxOverhangLength = 0;
+
+  const downDir = buildDir.clone().negate(); // direction toward platform
+
+  for (let t = 0; t < totalTris; t++) {
+    const i = t * 9;
+    const a = new THREE.Vector3(pos[i], pos[i+1], pos[i+2]);
+    const b = new THREE.Vector3(pos[i+3], pos[i+4], pos[i+5]);
+    const c = new THREE.Vector3(pos[i+6], pos[i+7], pos[i+8]);
+
+    const ab = new THREE.Vector3().subVectors(b, a);
+    const ac = new THREE.Vector3().subVectors(c, a);
+    const normal = new THREE.Vector3().crossVectors(ab, ac).normalize();
+
+    // Angle between face normal and downDir
+    // A face pointing straight down has angle = 0° (worst overhang)
+    // A face pointing straight up has angle = 180° (no overhang)
+    // A vertical face has angle = 90°
+    const dotDown = normal.dot(downDir);
+    // angleFromDown is the angle between normal and the down vector
+    // If dotDown > 0, the face normal points somewhat downward — this is an overhang
+    const angleFromHorizontal = Math.asin(Math.abs(normal.dot(buildDir))) * (180 / Math.PI);
+
+    let r, g, bl;
+    if (dotDown > 0.01) {
+      // Face normal points downward — it's an overhang
+      if (angleFromHorizontal < 30) {
+        // Severe overhang (< 30° from horizontal)
+        r = 0.9; g = 0.24; bl = 0.24;
+        overhanging30++;
+        // Estimate overhang extent from triangle span projected onto horizontal
+        const triWidth = Math.max(ab.length(), ac.length(), b.distanceTo(c));
+        if (triWidth > maxOverhangLength) maxOverhangLength = triWidth;
+      } else if (angleFromHorizontal < 45) {
+        // Marginal overhang
+        r = 0.84; g = 0.62; bl = 0.18;
+        overhanging45++;
+      } else {
+        // Supported enough
+        r = 0.22; g = 0.63; bl = 0.41;
+      }
+    } else {
+      // Not an overhang — face pointing up or sideways
+      r = 0.22; g = 0.63; bl = 0.41;
+    }
+
+    // Set vertex colors for all 3 vertices of this triangle
+    for (let v = 0; v < 3; v++) {
+      colors[i + v * 3]     = r;
+      colors[i + v * 3 + 1] = g;
+      colors[i + v * 3 + 2] = bl;
+    }
+  }
+
+  return { colors, overhanging30, overhanging45, totalTris, maxOverhangLength };
+}
+
+// Find minimum edge length in the mesh (proxy for minimum feature size)
+function findMinEdgeLength(geometry) {
+  const pos = geometry.getAttribute('position').array;
+  const totalTris = pos.length / 9;
+  let minEdge = Infinity;
+  const step = Math.max(1, Math.floor(totalTris / 500)); // sample
+
+  for (let t = 0; t < totalTris; t += step) {
+    const i = t * 9;
+    const a = new THREE.Vector3(pos[i], pos[i+1], pos[i+2]);
+    const b = new THREE.Vector3(pos[i+3], pos[i+4], pos[i+5]);
+    const c = new THREE.Vector3(pos[i+6], pos[i+7], pos[i+8]);
+
+    const ab = a.distanceTo(b);
+    const bc = b.distanceTo(c);
+    const ca = c.distanceTo(a);
+    const localMin = Math.min(ab, bc, ca);
+    if (localMin > 0.00001 && localMin < minEdge) minEdge = localMin;
+  }
+  return minEdge;
+}
+
+function runDesignCheck() {
+  if (!originalGeometry) return;
+
+  const s = getPartScale();
+  const dims = getScaledDimensions();
+  const R = BMF_RULES;
+  const results = [];
+
+  // 1. Build volume check
+  // After rotation, the part sits in a certain orientation. Check against build volume.
+  const sortedDims = [dims.x, dims.y, dims.z].sort((a, b) => b - a);
+  const buildVol = [R.buildVolume.x, R.buildVolume.y, R.buildVolume.z].sort((a, b) => b - a);
+  const fitsBuildVol = sortedDims[0] <= buildVol[0] && sortedDims[1] <= buildVol[1] && sortedDims[2] <= buildVol[2];
+
+  results.push({
+    rule: 'Part size vs build volume',
+    limit: `${R.buildVolume.x} × ${R.buildVolume.y} × ${R.buildVolume.z} mm`,
+    measured: `${dims.x.toFixed(2)} × ${dims.y.toFixed(2)} × ${dims.z.toFixed(2)} mm`,
+    status: fitsBuildVol ? 'pass' : 'fail',
+  });
+
+  // 2. Minimum volume
+  const rawVolume = computeMeshVolume(originalGeometry);
+  const volume = rawVolume * s * s * s;
+  results.push({
+    rule: 'Minimum part volume',
+    limit: `≥ ${R.minVolume} mm³`,
+    measured: `${volume.toFixed(4)} mm³`,
+    status: volume >= R.minVolume ? 'pass' : (volume >= R.minVolume * 0.5 ? 'warn' : 'fail'),
+  });
+
+  // 3. Minimum edge length (proxy for feature size)
+  const minEdge = findMinEdgeLength(originalGeometry) * s;
+  results.push({
+    rule: 'Smallest mesh edge (feature size proxy)',
+    limit: `≥ ${R.minFeatureSize} mm`,
+    measured: `${minEdge.toFixed(4)} mm`,
+    status: minEdge >= R.minFeatureSize ? 'pass' : 'warn',
+  });
+
+  // 4. Wall thickness estimate
+  const wallThickness = estimateMinWallThickness(originalGeometry, 200) * s;
+  if (wallThickness < Infinity) {
+    const wallStatus = wallThickness >= R.minWallUnsupported ? 'pass' :
+                       (wallThickness >= R.minWallSupported ? 'warn' : 'fail');
+    results.push({
+      rule: 'Estimated min wall thickness',
+      limit: `≥ ${R.minWallSupported} mm (supported) / ${R.minWallUnsupported} mm (unsupported)`,
+      measured: `~${wallThickness.toFixed(3)} mm`,
+      status: wallStatus,
+    });
+  } else {
+    results.push({
+      rule: 'Estimated min wall thickness',
+      limit: `≥ ${R.minWallSupported} mm`,
+      measured: 'Could not measure',
+      status: 'na',
+    });
+  }
+
+  // 5. Overhang analysis
+  const buildDir = new THREE.Vector3(0, 1, 0); // after reorientation, build = +Y
+  const targetDown = new THREE.Vector3(0, -1, 0);
+  const rotQuat = new THREE.Quaternion().setFromUnitVectors(baseNormal, targetDown);
+  const rotatedGeo = originalGeometry.clone();
+  rotatedGeo.applyQuaternion(rotQuat);
+
+  const overhangData = analyzeOverhangs(rotatedGeo, buildDir);
+  const ovhPct30 = ((overhangData.overhanging30 / overhangData.totalTris) * 100).toFixed(1);
+  const ovhPct45 = ((overhangData.overhanging45 / overhangData.totalTris) * 100).toFixed(1);
+
+  results.push({
+    rule: `Overhangs < ${R.minOverhangAngle}° from horizontal`,
+    limit: `≥ ${R.minOverhangAngle}° recommended`,
+    measured: `${overhangData.overhanging30} faces (${ovhPct30}%)`,
+    status: overhangData.overhanging30 === 0 ? 'pass' : (parseFloat(ovhPct30) < 5 ? 'warn' : 'fail'),
+  });
+
+  results.push({
+    rule: 'Marginal overhangs (30°–45°)',
+    limit: 'May need supports',
+    measured: `${overhangData.overhanging45} faces (${ovhPct45}%)`,
+    status: overhangData.overhanging45 === 0 ? 'pass' : 'info',
+  });
+
+  // 6. Max overhang span estimate
+  const maxOvhSpan = overhangData.maxOverhangLength * s;
+  if (overhangData.overhanging30 > 0) {
+    results.push({
+      rule: 'Est. max overhang span',
+      limit: `≤ ${R.maxUnbridgedOverhang} mm (unsupported) / ${R.maxBridgedOverhang} mm (bridged)`,
+      measured: `~${maxOvhSpan.toFixed(3)} mm`,
+      status: maxOvhSpan <= R.maxUnbridgedOverhang ? 'pass' :
+              (maxOvhSpan <= R.maxBridgedOverhang ? 'warn' : 'fail'),
+    });
+  }
+
+  // 7. Aspect ratio check (height / smallest XZ dimension)
+  const minXZ = Math.min(dims.x, dims.z);
+  const partHeight = dims.y;
+  if (minXZ > 0) {
+    const aspectRatio = partHeight / minXZ;
+    results.push({
+      rule: 'Aspect ratio (height / min width)',
+      limit: `≤ 40:1 (pins/pillars)`,
+      measured: `${aspectRatio.toFixed(1)}:1`,
+      status: aspectRatio <= 40 ? 'pass' : 'fail',
+    });
+  }
+
+  // 8. Feature clearance note
+  results.push({
+    rule: 'Min feature clearance',
+    limit: `≥ ${R.minFeatureClearance} mm`,
+    measured: 'Manual check recommended',
+    status: 'info',
+  });
+
+  // 9. Hole diameters note
+  results.push({
+    rule: 'Min hole diameter (vertical / horizontal)',
+    limit: `≥ ${R.minHoleDiaVert} / ${R.minHoleDiaHoriz} mm`,
+    measured: 'Manual check recommended',
+    status: 'info',
+  });
+
+  // Build overhang visualization
+  buildOverhangVisualization(rotatedGeo, overhangData.colors);
+
+  // Render results
+  renderCheckResults(results);
+
+  // Show overhang legend
+  document.getElementById('overhang-legend').style.display = 'flex';
+}
+
+function buildOverhangVisualization(rotatedGeo, colorArray) {
+  // Remove previous overhang mesh
+  if (overhangMesh) {
+    modelGroup.remove(overhangMesh);
+    overhangMesh.geometry.dispose();
+    overhangMesh.material.dispose();
+    overhangMesh = null;
+  }
+
+  const geo = rotatedGeo.clone();
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(colorArray, 3));
+  geo.computeBoundingBox();
+
+  const mat = new THREE.MeshPhysicalMaterial({
+    vertexColors: true,
+    transparent: true,
+    opacity: 0.6,
+    side: THREE.DoubleSide,
+    roughness: 0.5,
+    depthWrite: false,
+  });
+
+  overhangMesh = new THREE.Mesh(geo, mat);
+  // Position same as originalMesh
+  const tempBox = new THREE.Box3().setFromObject(overhangMesh);
+  overhangMesh.position.y -= tempBox.min.y;
+  overhangMesh.position.y += 0.001 * boundingSize; // tiny offset to avoid z-fight
+  modelGroup.add(overhangMesh);
+}
+
+function renderCheckResults(results) {
+  const container = document.getElementById('check-results');
+  const summaryEl = document.getElementById('check-summary');
+
+  const counts = { pass: 0, warn: 0, fail: 0, info: 0, na: 0 };
+  results.forEach(r => counts[r.status]++);
+
+  summaryEl.style.display = 'flex';
+  summaryEl.innerHTML = `
+    <span class="summary-item"><span class="dot" style="background:#38a169"></span>${counts.pass} pass</span>
+    <span class="summary-item"><span class="dot" style="background:#d69e2e"></span>${counts.warn} warn</span>
+    <span class="summary-item"><span class="dot" style="background:#e53e3e"></span>${counts.fail} fail</span>
+    ${counts.info ? `<span class="summary-item"><span class="dot" style="background:#4a90d9"></span>${counts.info} info</span>` : ''}
+  `;
+
+  let html = `<table class="check-table">
+    <thead><tr><th>Rule</th><th>Limit</th><th>Measured</th><th>Status</th></tr></thead>
+    <tbody>`;
+
+  for (const r of results) {
+    const badgeClass = `badge-${r.status}`;
+    const statusLabel = r.status === 'na' ? 'N/A' : r.status.toUpperCase();
+    html += `<tr class="status-${r.status}">
+      <td>${r.rule}</td>
+      <td>${r.limit}</td>
+      <td>${r.measured}</td>
+      <td><span class="badge ${badgeClass}">${statusLabel}</span></td>
+    </tr>`;
+  }
+  html += '</tbody></table>';
+  container.innerHTML = html;
+}
+
+// ─── Scale / Unit Controls ────────────────────────────────────────────
+document.getElementById('unit-select').addEventListener('change', (e) => {
+  const customInput = document.getElementById('custom-scale');
+  const hint = document.getElementById('scale-hint');
+  if (e.target.value === 'custom') {
+    customInput.style.display = 'block';
+    hint.textContent = '× → mm';
+  } else {
+    customInput.style.display = 'none';
+    hint.textContent = '';
+  }
+  updateScaledDimensions();
+});
+
+document.getElementById('custom-scale').addEventListener('input', () => {
+  updateScaledDimensions();
+});
+
+function updateScaledDimensions() {
+  if (!originalGeometry) return;
+  const dims = getScaledDimensions();
+  if (!dims) return;
+  showDimensions(new THREE.Vector3(dims.x, dims.y, dims.z));
+}
+
+document.getElementById('run-check-btn').addEventListener('click', () => {
+  runDesignCheck();
+});
 
 // ─── Boot ────────────────────────────────────────────────────────────
 init();
