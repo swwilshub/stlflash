@@ -645,9 +645,101 @@
     height: 14px;
     border-radius: 3px;
   }
+
+  /* ─── Unit Prompt Modal ─── */
+  #unit-modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    background: rgba(0,0,0,0.65);
+    display: none;
+    align-items: center;
+    justify-content: center;
+  }
+  #unit-modal-overlay.visible { display: flex; }
+  #unit-modal {
+    background: var(--panel);
+    border: 1px solid var(--accent);
+    border-radius: 12px;
+    padding: 28px 32px;
+    max-width: 380px;
+    width: 90%;
+    box-shadow: 0 16px 48px rgba(0,0,0,0.5);
+  }
+  #unit-modal h2 {
+    margin: 0 0 6px;
+    font-size: 18px;
+    color: var(--text);
+  }
+  #unit-modal p {
+    margin: 0 0 18px;
+    font-size: 13px;
+    color: var(--text-dim);
+    line-height: 1.5;
+  }
+  .unit-buttons {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+  }
+  .unit-btn {
+    flex: 1;
+    min-width: 80px;
+    padding: 12px 8px;
+    border: 2px solid var(--accent);
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text);
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-align: center;
+  }
+  .unit-btn:hover { border-color: #4a90d9; background: rgba(74,144,217,0.1); }
+  .unit-btn.selected { border-color: #4a90d9; background: rgba(74,144,217,0.2); }
+  .unit-btn small { display: block; font-size: 11px; font-weight: 400; color: var(--text-dim); margin-top: 2px; }
+  #unit-modal-dims {
+    padding: 10px 12px;
+    background: rgba(255,255,255,0.04);
+    border-radius: 6px;
+    font-size: 13px;
+    color: var(--text-dim);
+    margin-bottom: 14px;
+    font-variant-numeric: tabular-nums;
+  }
+  #unit-modal-confirm {
+    width: 100%;
+    padding: 10px;
+    border: none;
+    border-radius: 6px;
+    background: #4a90d9;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  #unit-modal-confirm:hover { background: #5ba0e9; }
 </style>
 </head>
 <body>
+
+<!-- Unit selection modal shown on file load -->
+<div id="unit-modal-overlay">
+  <div id="unit-modal">
+    <h2>What units is this STL in?</h2>
+    <p>STL files don't store units. Select the unit your CAD tool exported in so dimensions and design checks are accurate.</p>
+    <div class="unit-buttons">
+      <button class="unit-btn selected" data-scale="1">mm<small>most common</small></button>
+      <button class="unit-btn" data-scale="0.001">&mu;m<small>micro</small></button>
+      <button class="unit-btn" data-scale="25.4">inches<small>imperial</small></button>
+      <button class="unit-btn" data-scale="10">cm<small>metric</small></button>
+    </div>
+    <div id="unit-modal-dims">Dimensions will appear here</div>
+    <button id="unit-modal-confirm">Continue</button>
+  </div>
+</div>
 
 <header>
   <h1>STL <span>Flash</span> Viewer</h1>
@@ -1041,6 +1133,59 @@ function loadSTL(arrayBuffer) {
   controls.target.set(0, 0, 0);
   controls.update();
 
+  // Show unit selection modal before proceeding
+  showUnitModal(size);
+}
+
+function showUnitModal(rawSize) {
+  const overlay = document.getElementById('unit-modal-overlay');
+  const dimsEl = document.getElementById('unit-modal-dims');
+  const buttons = overlay.querySelectorAll('.unit-btn');
+  let chosenScale = 1;
+
+  function updatePreview(scale) {
+    const x = (rawSize.x * scale).toFixed(3);
+    const y = (rawSize.y * scale).toFixed(3);
+    const z = (rawSize.z * scale).toFixed(3);
+    dimsEl.innerHTML = `Part size: <strong>${x} × ${y} × ${z} mm</strong>`;
+  }
+
+  buttons.forEach(btn => {
+    btn.classList.remove('selected');
+    if (btn.dataset.scale === '1') btn.classList.add('selected');
+    btn.onclick = () => {
+      buttons.forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      chosenScale = parseFloat(btn.dataset.scale);
+      updatePreview(chosenScale);
+    };
+  });
+
+  updatePreview(1);
+  overlay.classList.add('visible');
+
+  document.getElementById('unit-modal-confirm').onclick = () => {
+    overlay.classList.remove('visible');
+    // Apply chosen scale to unit selects
+    const scaleStr = String(chosenScale);
+    ['unit-select', 'drawer-unit-select'].forEach(id => {
+      const sel = document.getElementById(id);
+      if (!sel) return;
+      // Check if it matches a preset option
+      const opt = Array.from(sel.options).find(o => o.value === scaleStr);
+      if (opt) { sel.value = scaleStr; }
+      else {
+        sel.value = 'custom';
+        const cusId = id === 'unit-select' ? 'custom-scale' : 'drawer-custom-scale';
+        const cus = document.getElementById(cusId);
+        if (cus) { cus.value = chosenScale; cus.style.display = 'block'; }
+      }
+    });
+    finishLoad(rawSize);
+  };
+}
+
+function finishLoad(size) {
   // Show UI
   document.getElementById('dropzone').classList.add('hidden');
   document.getElementById('controls').style.display = 'flex';
@@ -1188,70 +1333,81 @@ function rebuildVisualization() {
 function buildFlashGeometry(squishGeo, flashWidth, flashHeight, baseYOffset) {
   if (flashWidth <= 0) return;
 
-  // Find base vertices (those near Y = min in squishGeo local space)
   const positions = squishGeo.getAttribute('position').array;
   const bbox = squishGeo.boundingBox;
   const baseY = bbox.min.y;
   const totalHeight = bbox.max.y - bbox.min.y;
 
-  // Use progressively larger thresholds to ensure we get enough base points
+  // Collect base vertices near the bottom
   let basePoints2D = [];
   const thresholds = [
     totalHeight * 0.01 + 0.001,
     totalHeight * 0.03 + 0.01,
     totalHeight * 0.08 + 0.05,
   ];
-
   for (const threshold of thresholds) {
     basePoints2D = [];
     for (let i = 0; i < positions.length; i += 3) {
       const y = positions[i + 1];
-      // Only look ABOVE baseY (not abs — we want the bottom slice only)
       if (y - baseY < threshold && y - baseY >= 0) {
         basePoints2D.push(new THREE.Vector2(positions[i], positions[i + 2]));
       }
     }
     if (basePoints2D.length >= 3) break;
   }
-
   if (basePoints2D.length < 3) return;
 
-  // Compute 2D convex hull of base footprint
-  const hull = convexHull2D(basePoints2D);
-  if (hull.length < 3) return;
+  // Extract the actual concave perimeter using a 2D grid marching approach
+  const perimeter = extractConcavePerimeter(basePoints2D, flashWidth);
+  if (perimeter.length < 3) return;
 
-  // Expand hull outward by flashWidth using edge normals
-  const center2D = new THREE.Vector2(0, 0);
-  for (const p of hull) { center2D.add(p); }
-  center2D.divideScalar(hull.length);
+  // Resample perimeter to even spacing for smooth flash
+  const resampled = resamplePerimeter(perimeter, Math.max(60, perimeter.length));
 
-  const outerHull = hull.map(p => {
-    const dir = new THREE.Vector2().subVectors(p, center2D).normalize();
-    return new THREE.Vector2(p.x + dir.x * flashWidth, p.y + dir.y * flashWidth);
-  });
+  // Compute per-vertex outward normals for the perimeter
+  const normals2D = computePerimeterNormals(resampled);
 
-  // Build flash ring at the base Y level in squishGeo local space.
-  // This ensures the flash is in the exact same coordinate frame as the squish mesh.
+  // Build outer edge with wavy/organic offset (fried-egg look)
+  const outerEdge = [];
+  const nPts = resampled.length;
+  for (let i = 0; i < nPts; i++) {
+    const p = resampled[i];
+    const n = normals2D[i];
+    // Organic noise: combine multiple frequencies for natural look
+    const t = i / nPts;
+    const noise = wavyNoise(t, nPts, flashWidth);
+    const offset = flashWidth + noise;
+    outerEdge.push(new THREE.Vector2(
+      p.x + n.x * offset,
+      p.y + n.y * offset
+    ));
+  }
+
+  // Build flash ring mesh
   const flashVerts = [];
-  const n = hull.length;
-  const ringBottom = baseY;              // same Y as the base vertices
-  const ringTop = baseY + flashHeight;   // thin layer above base
+  const ringBottom = baseY;
+  const ringTop = baseY + flashHeight;
 
-  for (let i = 0; i < n; i++) {
-    const i2 = (i + 1) % n;
-    const inner1 = hull[i];
-    const inner2 = hull[i2];
-    const outer1 = outerHull[i];
-    const outer2 = outerHull[i2];
+  for (let i = 0; i < nPts; i++) {
+    const i2 = (i + 1) % nPts;
+    const inner1 = resampled[i], inner2 = resampled[i2];
+    const outer1 = outerEdge[i], outer2 = outerEdge[i2];
 
-    // Top face of flash ring
+    // Varying flash height for organic feel
+    const t1 = i / nPts, t2 = i2 / nPts;
+    const hNoise1 = 1.0 + 0.3 * Math.sin(t1 * Math.PI * 12.7) * Math.cos(t1 * Math.PI * 5.3);
+    const hNoise2 = 1.0 + 0.3 * Math.sin(t2 * Math.PI * 12.7) * Math.cos(t2 * Math.PI * 5.3);
+    const top1 = baseY + flashHeight * hNoise1;
+    const top2 = baseY + flashHeight * hNoise2;
+
+    // Top face (two triangles, use varying height at outer edge)
     flashVerts.push(inner1.x, ringTop, inner1.y);
-    flashVerts.push(outer1.x, ringTop, outer1.y);
+    flashVerts.push(outer1.x, top1, outer1.y);
     flashVerts.push(inner2.x, ringTop, inner2.y);
 
     flashVerts.push(inner2.x, ringTop, inner2.y);
-    flashVerts.push(outer1.x, ringTop, outer1.y);
-    flashVerts.push(outer2.x, ringTop, outer2.y);
+    flashVerts.push(outer1.x, top1, outer1.y);
+    flashVerts.push(outer2.x, top2, outer2.y);
 
     // Bottom face
     flashVerts.push(inner1.x, ringBottom, inner1.y);
@@ -1265,13 +1421,13 @@ function buildFlashGeometry(squishGeo, flashWidth, flashHeight, baseYOffset) {
     // Outer wall
     flashVerts.push(outer1.x, ringBottom, outer1.y);
     flashVerts.push(outer2.x, ringBottom, outer2.y);
-    flashVerts.push(outer1.x, ringTop, outer1.y);
+    flashVerts.push(outer1.x, top1, outer1.y);
 
     flashVerts.push(outer2.x, ringBottom, outer2.y);
-    flashVerts.push(outer2.x, ringTop, outer2.y);
-    flashVerts.push(outer1.x, ringTop, outer1.y);
+    flashVerts.push(outer2.x, top2, outer2.y);
+    flashVerts.push(outer1.x, top1, outer1.y);
 
-    // Inner wall (so the ring is visible from inside too)
+    // Inner wall
     flashVerts.push(inner1.x, ringBottom, inner1.y);
     flashVerts.push(inner1.x, ringTop, inner1.y);
     flashVerts.push(inner2.x, ringBottom, inner2.y);
@@ -1294,15 +1450,240 @@ function buildFlashGeometry(squishGeo, flashWidth, flashHeight, baseYOffset) {
   });
 
   flashMesh = new THREE.Mesh(flashGeo, flashMat);
-  // Use the SAME Y offset as squishMesh — this guarantees the flash base
-  // lands at world Y=0 (the platform), matching the squish mesh base exactly.
   flashMesh.position.y = baseYOffset;
   modelGroup.add(flashMesh);
 }
 
-// ─── Convex Hull (Graham scan) ───────────────────────────────────────
+// ─── Wavy noise for fried-egg flash edges ────────────────────────────
+function wavyNoise(t, nPts, flashWidth) {
+  // Combine several sine waves at different frequencies for organic look
+  const amp = flashWidth * 0.4;
+  return amp * (
+    0.45 * Math.sin(t * Math.PI * 7.3 + 1.2) +
+    0.30 * Math.sin(t * Math.PI * 13.7 + 3.8) +
+    0.15 * Math.sin(t * Math.PI * 23.1 + 0.5) +
+    0.10 * Math.cos(t * Math.PI * 31.9 + 2.1)
+  );
+}
+
+// ─── Concave perimeter extraction via grid-based alpha shape ─────────
+function extractConcavePerimeter(points2D, resolution) {
+  // Build a 2D occupancy grid, then trace the boundary
+  // Grid cell size controls how concave the boundary can be
+  const cellSize = resolution * 0.5; // half the flash width gives good concavity
+
+  // Compute bounds
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const p of points2D) {
+    if (p.x < minX) minX = p.x;
+    if (p.y < minY) minY = p.y;
+    if (p.x > maxX) maxX = p.x;
+    if (p.y > maxY) maxY = p.y;
+  }
+  // Pad by one cell
+  minX -= cellSize; minY -= cellSize; maxX += cellSize; maxY += cellSize;
+
+  const nx = Math.ceil((maxX - minX) / cellSize) + 1;
+  const ny = Math.ceil((maxY - minY) / cellSize) + 1;
+
+  // Clamp grid to reasonable size
+  if (nx * ny > 500000) {
+    // Fall back to convex hull for very large grids
+    return convexHull2D(points2D);
+  }
+
+  const grid = new Uint8Array(nx * ny); // 0 = empty, 1 = filled
+
+  // Fill grid cells that contain points
+  for (const p of points2D) {
+    const gx = Math.floor((p.x - minX) / cellSize);
+    const gy = Math.floor((p.y - minY) / cellSize);
+    if (gx >= 0 && gx < nx && gy >= 0 && gy < ny) {
+      grid[gy * nx + gx] = 1;
+    }
+  }
+
+  // Dilate by 1 cell to fill small gaps between adjacent triangles
+  const dilated = new Uint8Array(nx * ny);
+  for (let y = 0; y < ny; y++) {
+    for (let x = 0; x < nx; x++) {
+      if (grid[y * nx + x]) {
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            const nx2 = x + dx, ny2 = y + dy;
+            if (nx2 >= 0 && nx2 < nx && ny2 >= 0 && ny2 < ny) {
+              dilated[ny2 * nx + nx2] = 1;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // Flood-fill the exterior (from grid edges) to find inside vs outside
+  const exterior = new Uint8Array(nx * ny);
+  const queue = [];
+  // Seed from all edge cells that are empty
+  for (let x = 0; x < nx; x++) {
+    if (!dilated[x]) { exterior[x] = 1; queue.push(x); } // top row (y=0)
+    const bot = (ny-1) * nx + x;
+    if (!dilated[bot]) { exterior[bot] = 1; queue.push(bot); }
+  }
+  for (let y = 1; y < ny - 1; y++) {
+    const left = y * nx;
+    if (!dilated[left]) { exterior[left] = 1; queue.push(left); }
+    const right = y * nx + (nx - 1);
+    if (!dilated[right]) { exterior[right] = 1; queue.push(right); }
+  }
+  // BFS flood fill
+  let qi = 0;
+  while (qi < queue.length) {
+    const idx = queue[qi++];
+    const x = idx % nx, y = Math.floor(idx / nx);
+    const neighbors = [[x-1,y],[x+1,y],[x,y-1],[x,y+1]];
+    for (const [nx2, ny2] of neighbors) {
+      if (nx2 >= 0 && nx2 < nx && ny2 >= 0 && ny2 < ny) {
+        const nIdx = ny2 * nx + nx2;
+        if (!exterior[nIdx] && !dilated[nIdx]) {
+          exterior[nIdx] = 1;
+          queue.push(nIdx);
+        }
+      }
+    }
+  }
+
+  // Boundary cells: filled cells adjacent to exterior
+  const boundaryPts = [];
+  for (let y = 0; y < ny; y++) {
+    for (let x = 0; x < nx; x++) {
+      if (!dilated[y * nx + x]) continue;
+      // Check if any neighbor is exterior
+      let onBoundary = false;
+      for (const [dx, dy] of [[-1,0],[1,0],[0,-1],[0,1]]) {
+        const nx2 = x + dx, ny2 = y + dy;
+        if (nx2 < 0 || nx2 >= nx || ny2 < 0 || ny2 >= ny || exterior[ny2 * nx + nx2]) {
+          onBoundary = true;
+          break;
+        }
+      }
+      if (onBoundary) {
+        boundaryPts.push(new THREE.Vector2(
+          minX + (x + 0.5) * cellSize,
+          minY + (y + 0.5) * cellSize
+        ));
+      }
+    }
+  }
+
+  if (boundaryPts.length < 3) return convexHull2D(points2D);
+
+  // Order the boundary points into a closed loop by nearest-neighbor walk
+  return orderBoundaryPoints(boundaryPts);
+}
+
+function orderBoundaryPoints(pts) {
+  // Greedy nearest-neighbor ordering
+  const ordered = [];
+  const used = new Uint8Array(pts.length);
+  // Start from the point with smallest x (leftmost)
+  let startIdx = 0;
+  for (let i = 1; i < pts.length; i++) {
+    if (pts[i].x < pts[startIdx].x || (pts[i].x === pts[startIdx].x && pts[i].y < pts[startIdx].y)) {
+      startIdx = i;
+    }
+  }
+  ordered.push(pts[startIdx]);
+  used[startIdx] = 1;
+
+  for (let step = 1; step < pts.length; step++) {
+    const last = ordered[ordered.length - 1];
+    let bestDist = Infinity;
+    let bestIdx = -1;
+    for (let i = 0; i < pts.length; i++) {
+      if (used[i]) continue;
+      const dx = pts[i].x - last.x, dy = pts[i].y - last.y;
+      const d = dx * dx + dy * dy;
+      if (d < bestDist) { bestDist = d; bestIdx = i; }
+    }
+    if (bestIdx === -1) break;
+    ordered.push(pts[bestIdx]);
+    used[bestIdx] = 1;
+  }
+  return ordered;
+}
+
+// ─── Resample a closed perimeter to N evenly spaced points ──────────
+function resamplePerimeter(pts, targetN) {
+  if (pts.length <= 3) return pts;
+
+  // Compute total perimeter length
+  let totalLen = 0;
+  const n = pts.length;
+  const segLens = [];
+  for (let i = 0; i < n; i++) {
+    const next = pts[(i + 1) % n];
+    const len = pts[i].distanceTo(next);
+    segLens.push(len);
+    totalLen += len;
+  }
+
+  if (totalLen < 1e-10) return pts;
+
+  const step = totalLen / targetN;
+  const result = [];
+  let segIdx = 0, segT = 0;
+
+  for (let i = 0; i < targetN; i++) {
+    const dist = i * step;
+    // Walk along segments to find position at dist
+    let walked = 0;
+    segIdx = 0; segT = 0;
+    let remaining = dist;
+    while (segIdx < n && remaining > segLens[segIdx] + 1e-10) {
+      remaining -= segLens[segIdx];
+      segIdx++;
+    }
+    if (segIdx >= n) segIdx = n - 1;
+    const segLen = segLens[segIdx];
+    segT = segLen > 1e-10 ? remaining / segLen : 0;
+    segT = Math.min(1, Math.max(0, segT));
+
+    const a = pts[segIdx];
+    const b = pts[(segIdx + 1) % n];
+    result.push(new THREE.Vector2(
+      a.x + (b.x - a.x) * segT,
+      a.y + (b.y - a.y) * segT
+    ));
+  }
+  return result;
+}
+
+// ─── Compute outward normals for a closed 2D perimeter ──────────────
+function computePerimeterNormals(pts) {
+  const n = pts.length;
+  // Compute centroid to determine "outward" direction
+  const cx = pts.reduce((s, p) => s + p.x, 0) / n;
+  const cy = pts.reduce((s, p) => s + p.y, 0) / n;
+
+  const normals = [];
+  for (let i = 0; i < n; i++) {
+    const prev = pts[(i - 1 + n) % n];
+    const next = pts[(i + 1) % n];
+    // Tangent direction
+    const tx = next.x - prev.x, ty = next.y - prev.y;
+    const len = Math.sqrt(tx * tx + ty * ty) || 1;
+    // Normal (perpendicular to tangent)
+    let nx = -ty / len, ny = tx / len;
+    // Ensure it points outward (away from centroid)
+    const toCentX = cx - pts[i].x, toCentY = cy - pts[i].y;
+    if (nx * toCentX + ny * toCentY > 0) { nx = -nx; ny = -ny; }
+    normals.push(new THREE.Vector2(nx, ny));
+  }
+  return normals;
+}
+
+// ─── Convex Hull (Graham scan) — kept as fallback ────────────────────
 function convexHull2D(points) {
-  // Remove near-duplicates
   const eps = 0.0001;
   const unique = [];
   for (const p of points) {
@@ -1315,11 +1696,9 @@ function convexHull2D(points) {
 
   if (unique.length < 3) return unique;
 
-  // Find lowest-rightmost point
   unique.sort((a, b) => a.y - b.y || a.x - b.x);
   const pivot = unique[0];
 
-  // Sort by polar angle
   const rest = unique.slice(1);
   rest.sort((a, b) => {
     const angleA = Math.atan2(a.y - pivot.y, a.x - pivot.x);
@@ -1575,14 +1954,23 @@ function estimateMinWallThickness(geometry, numSamples) {
   const totalTris = pos.length / 9;
   if (totalTris === 0) return Infinity;
 
-  const rc = new THREE.Raycaster();
+  // Compute bounding diagonal for adaptive thresholds
   const tempGeo = geometry.clone();
-  // Ensure geometry has a valid index for raycasting (non-indexed is fine for STL)
+  tempGeo.computeBoundingBox();
+  const bboxSize = new THREE.Vector3();
+  tempGeo.boundingBox.getSize(bboxSize);
+  const diagLen = bboxSize.length();
+  // Minimum meaningful distance: skip hits closer than 0.5% of diagonal
+  // This avoids self-hits and adjacent-face hits on the same surface
+  const minDist = diagLen * 0.005;
+  // Offset origin by a bit more to clear the source face
+  const originOffset = diagLen * 0.002;
+
+  const rc = new THREE.Raycaster();
   const tempMesh = new THREE.Mesh(tempGeo, new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));
-  // Must update world matrix for raycaster to work on a detached mesh
   tempMesh.updateMatrixWorld(true);
 
-  let minThickness = Infinity;
+  const measurements = [];
   const step = Math.max(1, Math.floor(totalTris / numSamples));
 
   for (let t = 0; t < totalTris; t += step) {
@@ -1592,37 +1980,40 @@ function estimateMinWallThickness(geometry, numSamples) {
     const b = new THREE.Vector3(pos[i+3], pos[i+4], pos[i+5]);
     const c = new THREE.Vector3(pos[i+6], pos[i+7], pos[i+8]);
 
-    // Centroid
     const centroid = new THREE.Vector3().addVectors(a, b).add(c).divideScalar(3);
 
-    // Face normal (compute before normalizing to check for degenerate triangles)
     const ab = new THREE.Vector3().subVectors(b, a);
     const ac = new THREE.Vector3().subVectors(c, a);
     const cross = new THREE.Vector3().crossVectors(ab, ac);
-    if (cross.lengthSq() < 1e-12) continue; // degenerate triangle
+    if (cross.lengthSq() < 1e-12) continue;
     const normal = cross.normalize();
 
     // Cast ray inward (opposite of face normal)
     const inward = normal.clone().negate();
-    const origin = centroid.clone().addScaledVector(inward, 0.001); // offset to avoid self-hit
+    const origin = centroid.clone().addScaledVector(inward, originOffset);
     rc.set(origin, inward);
-    rc.far = 10000;
+    rc.far = diagLen * 2;
 
     try {
       const hits = rc.intersectObject(tempMesh, false);
-      if (hits.length > 0) {
-        const dist = hits[0].distance;
-        if (dist > 0.001 && dist < minThickness) {
-          minThickness = dist;
+      // Find the first hit that's far enough to be a real opposing wall
+      for (const hit of hits) {
+        if (hit.distance > minDist) {
+          measurements.push(hit.distance);
+          break;
         }
       }
-    } catch(e) {
-      // Skip this sample on error
-    }
+    } catch(e) { /* skip */ }
   }
 
   tempGeo.dispose();
-  return minThickness;
+
+  if (measurements.length === 0) return Infinity;
+
+  // Use the 5th percentile instead of absolute min to avoid noise
+  measurements.sort((a, b) => a - b);
+  const p5Index = Math.floor(measurements.length * 0.05);
+  return measurements[Math.max(0, p5Index)];
 }
 
 // Analyze overhangs — returns per-face angle data and builds colored mesh
