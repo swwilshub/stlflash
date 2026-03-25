@@ -1,0 +1,2510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>STL Flash Viewer — BMF S140 Print Orientation</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #1a1a2e;
+    --panel: #16213e;
+    --accent: #0f3460;
+    --highlight: #e94560;
+    --text: #eee;
+    --text-dim: #999;
+    --flash-color: #ff6b35;
+  }
+
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  header {
+    background: var(--panel);
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    border-bottom: 1px solid var(--accent);
+    flex-shrink: 0;
+  }
+
+  header h1 {
+    font-size: 18px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  header h1 span { color: var(--highlight); }
+
+  .header-controls {
+    display: flex;
+    gap: 10px;
+    margin-left: auto;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .header-controls label {
+    font-size: 13px;
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .header-controls input[type="range"] {
+    width: 100px;
+    accent-color: var(--highlight);
+  }
+
+  .header-controls .value-display {
+    min-width: 36px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    color: var(--text);
+    font-size: 13px;
+  }
+
+  button {
+    background: var(--accent);
+    color: var(--text);
+    border: 1px solid rgba(255,255,255,0.1);
+    padding: 6px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: background 0.15s;
+  }
+  button:hover { background: var(--highlight); }
+  button:disabled { opacity: 0.4; cursor: default; }
+
+  .main-area {
+    flex: 1;
+    display: flex;
+    position: relative;
+    overflow: hidden;
+  }
+
+  #viewport {
+    flex: 1;
+    position: relative;
+  }
+
+  #viewport canvas { display: block; }
+
+  /* Drop zone overlay */
+  #dropzone {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: rgba(26, 26, 46, 0.95);
+    z-index: 10;
+    transition: opacity 0.3s;
+  }
+
+  #dropzone.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  #dropzone.dragover {
+    background: rgba(15, 52, 96, 0.95);
+  }
+
+  .drop-icon {
+    width: 100px;
+    height: 100px;
+    border: 3px dashed var(--text-dim);
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 40px;
+    margin-bottom: 20px;
+    transition: border-color 0.2s;
+  }
+
+  #dropzone.dragover .drop-icon {
+    border-color: var(--highlight);
+  }
+
+  #dropzone h2 {
+    font-size: 22px;
+    margin-bottom: 8px;
+  }
+
+  #dropzone p {
+    color: var(--text-dim);
+    font-size: 14px;
+    margin-bottom: 16px;
+  }
+
+  #file-input { display: none; }
+
+  .browse-btn {
+    background: var(--highlight);
+    padding: 10px 24px;
+    border-radius: 8px;
+    font-size: 15px;
+    border: none;
+  }
+
+  /* Side panel */
+  .side-panel {
+    width: 340px;
+    background: var(--panel);
+    border-left: 1px solid var(--accent);
+    padding: 16px;
+    overflow-y: auto;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .panel-section h3 {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-dim);
+    margin-bottom: 8px;
+  }
+
+  .axis-btn-group {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+
+  .axis-btn {
+    padding: 10px;
+    text-align: center;
+    font-size: 13px;
+    border-radius: 6px;
+    transition: all 0.15s;
+  }
+
+  .axis-btn.active {
+    background: var(--highlight);
+    border-color: var(--highlight);
+  }
+
+  .info-box {
+    background: rgba(255,255,255,0.04);
+    border-radius: 8px;
+    padding: 12px;
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--text-dim);
+  }
+
+  .info-box strong { color: var(--text); }
+
+  .info-callout {
+    margin-top: 10px;
+    padding: 8px 10px;
+    background: rgba(255,255,255,0.06);
+    border-left: 3px solid var(--highlight);
+    border-radius: 0 6px 6px 0;
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  .legend {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+  }
+
+  .legend-swatch {
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+    flex-shrink: 0;
+  }
+
+  .dimensions {
+    font-size: 13px;
+    line-height: 1.8;
+  }
+
+  .dimensions .dim-label { color: var(--text-dim); }
+  .dimensions .dim-value { color: var(--text); font-variant-numeric: tabular-nums; }
+
+  /* Toast */
+  #toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: var(--accent);
+    color: var(--text);
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 14px;
+    opacity: 0;
+    transition: all 0.3s;
+    z-index: 100;
+    pointer-events: none;
+  }
+
+  #toast.show {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+  }
+
+  /* Design Check */
+  .scale-row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+
+  .scale-row select, .scale-row input {
+    background: var(--accent);
+    color: var(--text);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 4px;
+    padding: 4px 6px;
+    font-size: 12px;
+  }
+
+  .scale-row input[type="number"] {
+    width: 70px;
+  }
+
+  .design-check-btn {
+    width: 100%;
+    padding: 10px;
+    background: #2a6b4a;
+    font-size: 13px;
+    font-weight: 600;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 6px;
+    margin-bottom: 8px;
+  }
+  .design-check-btn:hover { background: #38a169; }
+
+  .check-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+  }
+
+  .check-table th {
+    text-align: left;
+    padding: 4px 4px;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    color: var(--text-dim);
+    font-weight: 500;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+
+  .check-table td {
+    padding: 5px 4px;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    vertical-align: top;
+  }
+
+  .check-table tr.status-pass td:first-child { border-left: 3px solid #38a169; padding-left: 6px; }
+  .check-table tr.status-warn td:first-child { border-left: 3px solid #d69e2e; padding-left: 6px; }
+  .check-table tr.status-fail td:first-child { border-left: 3px solid #e53e3e; padding-left: 6px; }
+  .check-table tr.status-info td:first-child { border-left: 3px solid #4a90d9; padding-left: 6px; }
+  .check-table tr.status-na td:first-child { border-left: 3px solid #555; padding-left: 6px; }
+
+  .badge {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+  .badge-pass { background: rgba(56,161,105,0.25); color: #68d391; }
+  .badge-warn { background: rgba(214,158,46,0.25); color: #ecc94b; }
+  .badge-fail { background: rgba(229,62,62,0.25); color: #fc8181; }
+  .badge-info { background: rgba(74,144,217,0.25); color: #90cdf4; }
+  .badge-na   { background: rgba(100,100,100,0.25); color: #999; }
+
+  .check-summary {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+    font-size: 12px;
+  }
+
+  .check-summary .summary-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .check-summary .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+  }
+
+  .printer-specs {
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--text-dim);
+  }
+
+  .printer-specs table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 6px;
+  }
+
+  .printer-specs table th,
+  .printer-specs table td {
+    padding: 3px 6px;
+    text-align: left;
+    font-size: 11px;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+  }
+
+  .printer-specs table th {
+    color: var(--text-dim);
+    font-weight: 500;
+  }
+
+  .overhang-legend {
+    display: flex;
+    gap: 6px;
+    margin-top: 6px;
+    flex-wrap: wrap;
+  }
+
+  .overhang-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+
+  .overhang-legend-item .swatch {
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+  }
+
+  /* Platform indicator */
+  .platform-label {
+    position: absolute;
+    bottom: 16px;
+    right: 16px;
+    background: rgba(0,0,0,0.6);
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    color: var(--text-dim);
+    z-index: 5;
+    pointer-events: none;
+  }
+
+  /* ─── Bottom Drawer: Design Check ─── */
+  #design-drawer-toggle {
+    position: fixed;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 50;
+    background: #2a6b4a;
+    color: #fff;
+    border: 2px solid #38a169;
+    border-bottom: none;
+    border-radius: 10px 10px 0 0;
+    padding: 8px 28px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    letter-spacing: 0.5px;
+    display: none;
+    box-shadow: 0 -2px 16px rgba(56,161,105,0.25);
+    transition: background 0.2s;
+  }
+  #design-drawer-toggle:hover { background: #38a169; }
+  #design-drawer-toggle.has-issues { background: #c53030; border-color: #e53e3e; box-shadow: 0 -2px 16px rgba(229,62,62,0.3); }
+  #design-drawer-toggle.has-issues:hover { background: #e53e3e; }
+
+  #design-drawer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 49;
+    background: var(--panel);
+    border-top: 2px solid #38a169;
+    max-height: 55vh;
+    overflow-y: auto;
+    transform: translateY(100%);
+    transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 -8px 30px rgba(0,0,0,0.5);
+    display: none;
+  }
+  #design-drawer.open {
+    transform: translateY(0);
+  }
+  #design-drawer.has-issues { border-top-color: #e53e3e; }
+
+  .drawer-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 24px;
+    border-bottom: 1px solid var(--accent);
+    position: sticky;
+    top: 0;
+    background: var(--panel);
+    z-index: 1;
+  }
+  .drawer-header h2 {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text);
+  }
+  .drawer-close {
+    background: transparent;
+    border: 1px solid rgba(255,255,255,0.15);
+    color: var(--text-dim);
+    font-size: 18px;
+    padding: 2px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  .drawer-close:hover { color: var(--text); background: rgba(255,255,255,0.08); }
+
+  .drawer-body {
+    padding: 16px 24px 24px;
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+  }
+
+  .drawer-col {
+    flex: 1;
+    min-width: 280px;
+  }
+
+  .drawer-col h3 {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-dim);
+    margin-bottom: 10px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+  }
+
+  .scale-row-drawer {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 12px;
+    padding: 8px 12px;
+    background: rgba(255,255,255,0.04);
+    border-radius: 6px;
+  }
+  .scale-row-drawer label { font-size: 13px; color: var(--text-dim); }
+  .scale-row-drawer select, .scale-row-drawer input {
+    background: var(--accent);
+    color: var(--text);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 4px;
+    padding: 5px 8px;
+    font-size: 13px;
+  }
+  .scale-row-drawer input[type="number"] { width: 80px; }
+
+  .drawer-rules-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  .drawer-rules-table th {
+    text-align: left;
+    padding: 5px 8px;
+    color: var(--text-dim);
+    font-weight: 500;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+  }
+  .drawer-rules-table td {
+    padding: 5px 8px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    color: var(--text-dim);
+  }
+  .drawer-rules-table td:last-child { color: var(--text); font-variant-numeric: tabular-nums; }
+
+  /* Analysis results in drawer */
+  .drawer-check-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  .drawer-check-table th {
+    text-align: left;
+    padding: 6px 8px;
+    color: var(--text-dim);
+    font-weight: 500;
+    font-size: 10px;
+    text-transform: uppercase;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+  }
+  .drawer-check-table td {
+    padding: 6px 8px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    vertical-align: middle;
+  }
+  .drawer-check-table tr.status-pass td:first-child { border-left: 3px solid #38a169; }
+  .drawer-check-table tr.status-warn td:first-child { border-left: 3px solid #d69e2e; }
+  .drawer-check-table tr.status-fail td:first-child { border-left: 3px solid #e53e3e; }
+  .drawer-check-table tr.status-info td:first-child { border-left: 3px solid #4a90d9; }
+  .drawer-check-table tr.status-na td:first-child { border-left: 3px solid #555; }
+
+  .drawer-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+  .drawer-badge-pass { background: rgba(56,161,105,0.2); color: #68d391; }
+  .drawer-badge-warn { background: rgba(214,158,46,0.2); color: #ecc94b; }
+  .drawer-badge-fail { background: rgba(229,62,62,0.2); color: #fc8181; }
+  .drawer-badge-info { background: rgba(74,144,217,0.2); color: #90cdf4; }
+  .drawer-badge-na   { background: rgba(100,100,100,0.2); color: #999; }
+
+  .drawer-summary {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 12px;
+    padding: 10px 14px;
+    background: rgba(255,255,255,0.04);
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .drawer-summary .s-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .drawer-summary .s-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+  }
+
+  .drawer-overhang-legend {
+    display: flex;
+    gap: 12px;
+    margin-top: 12px;
+    padding: 8px 12px;
+    background: rgba(255,255,255,0.04);
+    border-radius: 6px;
+  }
+  .drawer-overhang-legend .ol-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+  .drawer-overhang-legend .ol-swatch {
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+  }
+
+  /* ─── Unit Prompt Modal ─── */
+  #unit-modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    background: rgba(0,0,0,0.65);
+    display: none;
+    align-items: center;
+    justify-content: center;
+  }
+  #unit-modal-overlay.visible { display: flex; }
+  #unit-modal {
+    background: var(--panel);
+    border: 1px solid var(--accent);
+    border-radius: 12px;
+    padding: 28px 32px;
+    max-width: 380px;
+    width: 90%;
+    box-shadow: 0 16px 48px rgba(0,0,0,0.5);
+  }
+  #unit-modal h2 {
+    margin: 0 0 6px;
+    font-size: 18px;
+    color: var(--text);
+  }
+  #unit-modal p {
+    margin: 0 0 18px;
+    font-size: 13px;
+    color: var(--text-dim);
+    line-height: 1.5;
+  }
+  .unit-buttons {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+  }
+  .unit-btn {
+    flex: 1;
+    min-width: 80px;
+    padding: 12px 8px;
+    border: 2px solid var(--accent);
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text);
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-align: center;
+  }
+  .unit-btn:hover { border-color: #4a90d9; background: rgba(74,144,217,0.1); }
+  .unit-btn.selected { border-color: #4a90d9; background: rgba(74,144,217,0.2); }
+  .unit-btn small { display: block; font-size: 11px; font-weight: 400; color: var(--text-dim); margin-top: 2px; }
+  #unit-modal-dims {
+    padding: 10px 12px;
+    background: rgba(255,255,255,0.04);
+    border-radius: 6px;
+    font-size: 13px;
+    color: var(--text-dim);
+    margin-bottom: 14px;
+    font-variant-numeric: tabular-nums;
+  }
+  #unit-modal-confirm {
+    width: 100%;
+    padding: 10px;
+    border: none;
+    border-radius: 6px;
+    background: #4a90d9;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  #unit-modal-confirm:hover { background: #5ba0e9; }
+</style>
+</head>
+<body>
+
+<!-- Unit selection modal shown on file load -->
+<div id="unit-modal-overlay">
+  <div id="unit-modal">
+    <h2>What units is this STL in?</h2>
+    <p>STL files don't store units. Select the unit your CAD tool exported in so dimensions and design checks are accurate.</p>
+    <div class="unit-buttons">
+      <button class="unit-btn selected" data-scale="1">mm<small>most common</small></button>
+      <button class="unit-btn" data-scale="0.001">&mu;m<small>micro</small></button>
+      <button class="unit-btn" data-scale="25.4">inches<small>imperial</small></button>
+      <button class="unit-btn" data-scale="10">cm<small>metric</small></button>
+    </div>
+    <div id="unit-modal-dims">Dimensions will appear here</div>
+    <button id="unit-modal-confirm">Continue</button>
+  </div>
+</div>
+
+<header>
+  <h1>STL <span>Flash</span> Viewer</h1>
+  <div class="header-controls" id="controls" style="display:none">
+    <label>
+      Squish
+      <input type="range" id="squish-slider" min="0" max="10" step="0.5" value="3">
+      <span class="value-display" id="squish-value">3%</span>
+    </label>
+    <label>
+      Flash width
+      <input type="range" id="flash-slider" min="0" max="2" step="0.05" value="0.5">
+      <span class="value-display" id="flash-value">0.50mm</span>
+    </label>
+    <label>
+      Flash height
+      <input type="range" id="flash-height-slider" min="0.01" max="0.3" step="0.01" value="0.08">
+      <span class="value-display" id="flash-height-value">0.08mm</span>
+    </label>
+    <button id="reset-btn">Reset View</button>
+  </div>
+</header>
+
+<div class="main-area">
+  <div id="viewport">
+    <div id="dropzone">
+      <div class="drop-icon">&#128230;</div>
+      <h2>Drop your STL file here</h2>
+      <p>or click to browse</p>
+      <button class="browse-btn" onclick="document.getElementById('file-input').click()">
+        Choose STL File
+      </button>
+      <input type="file" id="file-input" accept=".stl">
+    </div>
+    <div class="platform-label" id="platform-label" style="display:none">
+      BMF S140 — Build platform shown in blue
+    </div>
+  </div>
+
+  <div class="side-panel" id="side-panel" style="display:none">
+    <div class="panel-section">
+      <h3>Select Base Direction</h3>
+      <p style="font-size:12px;color:var(--text-dim);margin-bottom:8px">
+        Choose which face sits on the print platform:
+      </p>
+      <div class="axis-btn-group">
+        <button class="axis-btn" data-axis="+y">Top (+Y)</button>
+        <button class="axis-btn" data-axis="-y">Bottom (-Y)</button>
+        <button class="axis-btn" data-axis="+x">Right (+X)</button>
+        <button class="axis-btn" data-axis="-x">Left (-X)</button>
+        <button class="axis-btn" data-axis="+z">Front (+Z)</button>
+        <button class="axis-btn" data-axis="-z">Back (-Z)</button>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <h3>Or Click a Face</h3>
+      <p style="font-size:12px;color:var(--text-dim)">
+        Click on any face of the model to set it as the base. The clicked face's normal will become the down direction.
+      </p>
+    </div>
+
+    <div class="panel-section" id="dims-section" style="display:none">
+      <h3>Part Dimensions</h3>
+      <div class="scale-row">
+        <label style="font-size:12px;color:var(--text-dim)">Units:</label>
+        <select id="unit-select">
+          <option value="1" selected>mm</option>
+          <option value="0.001">μm</option>
+          <option value="25.4">inches</option>
+          <option value="custom">Custom</option>
+        </select>
+        <input type="number" id="custom-scale" value="1" min="0.0001" step="any"
+               style="display:none" placeholder="Scale to mm">
+        <span style="font-size:11px;color:var(--text-dim)" id="scale-hint"></span>
+      </div>
+      <div class="dimensions" id="dimensions"></div>
+    </div>
+
+    <div class="panel-section" id="design-check-section" style="display:none">
+      <h3>BMF S140 Design Rules</h3>
+      <div class="info-box" style="margin-bottom:10px">
+        <table class="check-table" style="margin:0">
+          <thead><tr><th>Rule</th><th>Value</th></tr></thead>
+          <tbody>
+            <tr><td>Max part size</td><td>94 × 52 × 45 mm</td></tr>
+            <tr><td>Min part volume</td><td>1 mm³</td></tr>
+            <tr><td>Min feature size</td><td>50 μm</td></tr>
+            <tr><td>Min hole ⌀ (vert / horiz)</td><td>50 / 150 μm</td></tr>
+            <tr><td>Min wall (supported)</td><td>50 μm</td></tr>
+            <tr><td>Min wall (unsupported)</td><td>100 μm</td></tr>
+            <tr><td>Min overhang angle</td><td>30°</td></tr>
+            <tr><td>Max bridged overhang</td><td>1.5 mm</td></tr>
+            <tr><td>Max unbridged overhang</td><td>0.3 mm</td></tr>
+            <tr><td>Aspect ratio — channels</td><td>100:1</td></tr>
+            <tr><td>Aspect ratio — pins</td><td>40:1</td></tr>
+            <tr><td>Min feature clearance</td><td>100 μm</td></tr>
+            <tr><td>Layer height</td><td>10 – 50 μm</td></tr>
+            <tr><td>Support cone top ⌀</td><td>80 – 200 μm</td></tr>
+            <tr><td>Support cone base ⌀</td><td>0.1 – 1 mm</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Analysis Results</h3>
+      <button class="design-check-btn" id="run-check-btn">Re-run Design Check</button>
+      <div id="check-summary" class="check-summary" style="display:none"></div>
+      <div id="check-results"><p style="font-size:12px;color:var(--text-dim)">Analyzing…</p></div>
+      <div class="overhang-legend" id="overhang-legend" style="display:none">
+        <div class="overhang-legend-item">
+          <div class="swatch" style="background:#38a169"></div> Safe (&gt;45°)
+        </div>
+        <div class="overhang-legend-item">
+          <div class="swatch" style="background:#d69e2e"></div> Bridged / marginal
+        </div>
+        <div class="overhang-legend-item">
+          <div class="swatch" style="background:#e53e3e"></div> Unsupported (&lt;30°)
+        </div>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <h3>Legend</h3>
+      <div class="legend">
+        <div class="legend-item">
+          <div class="legend-swatch" style="background:#b0bec5"></div>
+          Original part
+        </div>
+        <div class="legend-item">
+          <div class="legend-swatch" style="background:rgba(233,69,96,0.5)"></div>
+          Squished shape
+        </div>
+        <div class="legend-item">
+          <div class="legend-swatch" style="background:#ff6b35"></div>
+          Flash / flashing
+        </div>
+        <div class="legend-item">
+          <div class="legend-swatch" style="background:rgba(70,130,220,0.3)"></div>
+          Build platform
+        </div>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <h3>
+        <span class="legend-swatch" style="background:#ff6b35;display:inline-block;vertical-align:middle;margin-right:6px"></span>
+        What is Flashing?
+      </h3>
+      <div class="info-box">
+        The BMF S130 uses <strong>Projection Micro Stereolithography (P&mu;SL)</strong> — a UV projector
+        cures liquid resin one layer at a time. The very first layers are printed directly onto the
+        build platform so the part stays anchored during the print.
+        <br><br>
+        At this interface, UV light scatters and reflects off the platform surface, curing resin
+        <strong>slightly beyond</strong> the intended boundary of the part. This creates a thin rim of
+        excess cured material around the base known as <strong>"flash"</strong> or <strong>"flashing"</strong>.
+        <br><br>
+        Flash is typically <strong>0.1 &ndash; 0.5 mm</strong> wide and only a few layers thick.
+        It can usually be removed with light sanding or a blade, but it means the base surface
+        won't have the same clean edge as the rest of the part.
+        <div class="info-callout">
+          <strong>Tip:</strong> Orient your part so the base face is a non-critical surface — avoid
+          putting precision edges, sealing faces, or cosmetic surfaces on the platform side.
+        </div>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <h3>
+        <span class="legend-swatch" style="background:rgba(233,69,96,0.7);display:inline-block;vertical-align:middle;margin-right:6px"></span>
+        What is Squish?
+      </h3>
+      <div class="info-box">
+        To ensure reliable adhesion to the build platform, the first several layers of the print
+        are <strong>slightly over-compressed</strong> against the platform. The projector also
+        applies longer exposure times to these initial layers to ensure they bond.
+        <br><br>
+        This means the part can be <strong>~1 &ndash; 5% shorter</strong> in the build direction
+        (the axis perpendicular to the platform). The effect is most pronounced on shorter parts
+        where the compressed layers make up a larger proportion of the total height.
+        <br><br>
+        The red overlay shows how your part's shape changes compared to the original
+        (shown as the transparent grey ghost).
+        <div class="info-callout">
+          <strong>Tip:</strong> If a dimension is critical, orient the part so that axis runs
+          <em>parallel</em> to the platform — not perpendicular to it. Dimensions in the
+          platform plane (X/Z) are unaffected by squish.
+        </div>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <h3>BMF S140 Specifications</h3>
+      <div class="info-box printer-specs">
+        The <strong>BMF microArch S140</strong> uses <strong>Projection Micro Stereolithography
+        (P&mu;SL)</strong> with <strong>10 &mu;m pixel size</strong>.
+        <table>
+          <tr><th colspan="2" style="color:var(--text)">Image Resolution</th></tr>
+          <tr><td>Single exposure</td><td>1920 &times; 1080 px (19.2 &times; 10.8 mm)</td></tr>
+          <tr><td>Stitched</td><td>9400 &times; 5200 px (94 &times; 52 mm)</td></tr>
+          <tr><th colspan="2" style="color:var(--text);padding-top:6px">Build Volume</th></tr>
+          <tr><td>X &times; Y &times; Z</td><td><strong>94 &times; 52 &times; 45 mm</strong></td></tr>
+          <tr><th colspan="2" style="color:var(--text);padding-top:6px">Layer Height</th></tr>
+          <tr><td>Range</td><td>10 &ndash; 50 &mu;m</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Design Check Toggle Button (fixed to bottom of screen) -->
+<button id="design-drawer-toggle">DESIGN RULES CHECK</button>
+
+<!-- Design Check Drawer -->
+<div id="design-drawer">
+  <div class="drawer-header">
+    <h2>BMF S140 Design Rules Check</h2>
+    <button class="drawer-close" id="drawer-close-btn">&times;</button>
+  </div>
+  <div class="drawer-body">
+
+    <!-- Left column: reference rules + scale -->
+    <div class="drawer-col">
+      <h3>Design Guidelines (Reference)</h3>
+      <div class="scale-row-drawer">
+        <label>Units:</label>
+        <select id="drawer-unit-select">
+          <option value="1" selected>mm</option>
+          <option value="0.001">&mu;m</option>
+          <option value="25.4">inches</option>
+          <option value="custom">Custom</option>
+        </select>
+        <input type="number" id="drawer-custom-scale" value="1" min="0.0001" step="any"
+               style="display:none" placeholder="Scale">
+        <span style="font-size:11px;color:var(--text-dim)" id="drawer-scale-hint"></span>
+      </div>
+      <table class="drawer-rules-table">
+        <thead><tr><th>Design Feature</th><th>Recommended</th></tr></thead>
+        <tbody>
+          <tr><td>Max part size</td><td>94 &times; 52 &times; 45 mm</td></tr>
+          <tr><td>Min part volume</td><td>1 mm&sup3;</td></tr>
+          <tr><td>Min feature size</td><td>50 &mu;m</td></tr>
+          <tr><td>Min hole &oslash; (vertical)</td><td>50 &mu;m</td></tr>
+          <tr><td>Min hole &oslash; (horizontal)</td><td>150 &mu;m</td></tr>
+          <tr><td>Min wall — supported</td><td>50 &mu;m</td></tr>
+          <tr><td>Min wall — unsupported</td><td>100 &mu;m</td></tr>
+          <tr><td>Min overhang angle</td><td>30&deg;</td></tr>
+          <tr><td>Max bridged overhang</td><td>1.5 mm</td></tr>
+          <tr><td>Max unbridged overhang</td><td>0.3 mm</td></tr>
+          <tr><td>Aspect ratio — channels</td><td>100:1</td></tr>
+          <tr><td>Aspect ratio — pins/pillars</td><td>40:1</td></tr>
+          <tr><td>Min feature clearance</td><td>100 &mu;m</td></tr>
+          <tr><td>Part-to-part spacing</td><td>100 &mu;m</td></tr>
+          <tr><td>Layer height</td><td>10 &ndash; 50 &mu;m</td></tr>
+          <tr><td>Support cone top &oslash;</td><td>80 &ndash; 200 &mu;m</td></tr>
+          <tr><td>Support cone base &oslash;</td><td>0.1 &ndash; 1 mm</td></tr>
+          <tr><td>Channel shape &gt; 100 &mu;m</td><td>rectangular or circular</td></tr>
+          <tr><td>Channel shape &lt; 100 &mu;m</td><td>circular</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Right column: analysis results -->
+    <div class="drawer-col">
+      <h3>Your Part Analysis</h3>
+      <div id="drawer-summary" class="drawer-summary" style="display:none"></div>
+      <div id="drawer-results"><p style="color:var(--text-dim);font-size:13px">Load an STL file to see analysis results.</p></div>
+      <div id="drawer-overhang-legend" class="drawer-overhang-legend" style="display:none">
+        <div class="ol-item"><div class="ol-swatch" style="background:#38a169"></div>Safe (&gt;45&deg;)</div>
+        <div class="ol-item"><div class="ol-swatch" style="background:#d69e2e"></div>Bridged / marginal</div>
+        <div class="ol-item"><div class="ol-swatch" style="background:#e53e3e"></div>Unsupported (&lt;30&deg;)</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.170.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.170.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { STLLoader } from 'three/addons/loaders/STLLoader.js';
+
+// ─── State ───────────────────────────────────────────────────────────
+let scene, camera, renderer, controls;
+let originalGeometry = null;   // BufferGeometry from STL
+let originalMesh = null;       // wireframe/ghost of original
+let squishMesh = null;         // the squished version
+let flashMesh = null;          // flashing geometry
+let platformMesh = null;       // build platform plane
+let arrowHelper = null;        // shows build direction
+let baseNormal = new THREE.Vector3(0, -1, 0); // default: bottom face is base
+let modelGroup = new THREE.Group();
+let boundingSize = 1;
+
+const loader = new STLLoader();
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+
+// ─── Init Three.js ───────────────────────────────────────────────────
+function init() {
+  const container = document.getElementById('viewport');
+
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x1a1a2e);
+
+  camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.01, 1000);
+  camera.position.set(3, 3, 3);
+
+  renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(window.devicePixelRatio);
+  renderer.setSize(container.clientWidth, container.clientHeight);
+  renderer.shadowMap.enabled = true;
+  container.appendChild(renderer.domElement);
+
+  controls = new OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.08;
+
+  // Lights
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+  scene.add(ambientLight);
+
+  const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
+  dirLight.position.set(5, 10, 7);
+  dirLight.castShadow = true;
+  scene.add(dirLight);
+
+  const dirLight2 = new THREE.DirectionalLight(0xffffff, 0.3);
+  dirLight2.position.set(-5, 3, -5);
+  scene.add(dirLight2);
+
+  scene.add(modelGroup);
+
+  // Grid
+  const gridHelper = new THREE.GridHelper(20, 40, 0x333355, 0x222244);
+  scene.add(gridHelper);
+
+  window.addEventListener('resize', onResize);
+  renderer.domElement.addEventListener('click', onCanvasClick);
+
+  animate();
+}
+
+function onResize() {
+  const container = document.getElementById('viewport');
+  camera.aspect = container.clientWidth / container.clientHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(container.clientWidth, container.clientHeight);
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+// ─── File Loading ────────────────────────────────────────────────────
+function loadSTL(arrayBuffer) {
+  const geometry = loader.parse(arrayBuffer);
+  geometry.computeVertexNormals();
+  geometry.computeBoundingBox();
+
+  originalGeometry = geometry;
+
+  // Center geometry
+  const center = new THREE.Vector3();
+  geometry.boundingBox.getCenter(center);
+  geometry.translate(-center.x, -center.y, -center.z);
+  geometry.computeBoundingBox();
+
+  // Compute bounding size for scaling UI elements
+  const box = geometry.boundingBox;
+  const size = new THREE.Vector3();
+  box.getSize(size);
+  boundingSize = Math.max(size.x, size.y, size.z);
+
+  // Fit camera
+  const dist = boundingSize * 2.2;
+  camera.position.set(dist * 0.7, dist * 0.6, dist * 0.9);
+  controls.target.set(0, 0, 0);
+  controls.update();
+
+  // Show unit selection modal before proceeding
+  showUnitModal(size);
+}
+
+function showUnitModal(rawSize) {
+  const overlay = document.getElementById('unit-modal-overlay');
+  const dimsEl = document.getElementById('unit-modal-dims');
+  const buttons = overlay.querySelectorAll('.unit-btn');
+  let chosenScale = 1;
+
+  function updatePreview(scale) {
+    const x = (rawSize.x * scale).toFixed(3);
+    const y = (rawSize.y * scale).toFixed(3);
+    const z = (rawSize.z * scale).toFixed(3);
+    dimsEl.innerHTML = `Part size: <strong>${x} × ${y} × ${z} mm</strong>`;
+  }
+
+  buttons.forEach(btn => {
+    btn.classList.remove('selected');
+    if (btn.dataset.scale === '1') btn.classList.add('selected');
+    btn.onclick = () => {
+      buttons.forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      chosenScale = parseFloat(btn.dataset.scale);
+      updatePreview(chosenScale);
+    };
+  });
+
+  updatePreview(1);
+  overlay.classList.add('visible');
+
+  document.getElementById('unit-modal-confirm').onclick = () => {
+    overlay.classList.remove('visible');
+    // Apply chosen scale to unit selects
+    const scaleStr = String(chosenScale);
+    ['unit-select', 'drawer-unit-select'].forEach(id => {
+      const sel = document.getElementById(id);
+      if (!sel) return;
+      // Check if it matches a preset option
+      const opt = Array.from(sel.options).find(o => o.value === scaleStr);
+      if (opt) { sel.value = scaleStr; }
+      else {
+        sel.value = 'custom';
+        const cusId = id === 'unit-select' ? 'custom-scale' : 'drawer-custom-scale';
+        const cus = document.getElementById(cusId);
+        if (cus) { cus.value = chosenScale; cus.style.display = 'block'; }
+      }
+    });
+    finishLoad(rawSize);
+  };
+}
+
+function finishLoad(size) {
+  // Show UI
+  document.getElementById('dropzone').classList.add('hidden');
+  document.getElementById('controls').style.display = 'flex';
+  document.getElementById('side-panel').style.display = 'flex';
+  document.getElementById('platform-label').style.display = 'block';
+
+  // Show dimensions (using current scale)
+  const s = getPartScale();
+  showDimensions(new THREE.Vector3(size.x * s, size.y * s, size.z * s));
+
+  // Show design check section and drawer toggle
+  document.getElementById('design-check-section').style.display = 'block';
+  const toggleBtn = document.getElementById('design-drawer-toggle');
+  if (toggleBtn) { toggleBtn.style.display = 'block'; toggleBtn.textContent = 'DESIGN CHECK: ANALYZING...'; }
+
+  // Default base: -Y
+  baseNormal.set(0, -1, 0);
+  setActiveAxisButton('-y');
+  rebuildVisualization();
+
+  // Auto-run design check after a small delay to let rendering settle
+  setTimeout(() => { try { runDesignCheck(); } catch(e) { console.error('Design check error:', e); } }, 100);
+
+  toast('STL loaded! Select a base direction or click a face.');
+}
+
+function showDimensions(size) {
+  const el = document.getElementById('dimensions');
+  const section = document.getElementById('dims-section');
+  section.style.display = 'block';
+  el.innerHTML = `
+    <span class="dim-label">X:</span> <span class="dim-value">${size.x.toFixed(3)} mm</span><br>
+    <span class="dim-label">Y:</span> <span class="dim-value">${size.y.toFixed(3)} mm</span><br>
+    <span class="dim-label">Z:</span> <span class="dim-value">${size.z.toFixed(3)} mm</span>
+  `;
+}
+
+// ─── Visualization ───────────────────────────────────────────────────
+function rebuildVisualization() {
+  // Clear previous
+  while (modelGroup.children.length) modelGroup.remove(modelGroup.children[0]);
+  overhangMesh = null; // cleared with the group
+
+  if (!originalGeometry) return;
+
+  const squishPct = parseFloat(document.getElementById('squish-slider').value) / 100;
+  const flashWidth = parseFloat(document.getElementById('flash-slider').value);
+  const flashHeight = parseFloat(document.getElementById('flash-height-slider').value);
+
+  // The base normal points "down" (toward platform). Build direction is opposite.
+  const buildDir = baseNormal.clone().negate(); // direction away from platform
+
+  // We need a rotation that maps baseNormal to -Y (so the base sits on the XZ plane)
+  const targetDown = new THREE.Vector3(0, -1, 0);
+  const rotationQuat = new THREE.Quaternion().setFromUnitVectors(baseNormal, targetDown);
+
+  // ── Original mesh (ghost wireframe) ──
+  const origMat = new THREE.MeshPhysicalMaterial({
+    color: 0xb0bec5,
+    transparent: true,
+    opacity: 0.25,
+    wireframe: false,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+  });
+  originalMesh = new THREE.Mesh(originalGeometry.clone(), origMat);
+  originalMesh.quaternion.copy(rotationQuat);
+
+  // Shift so base sits on Y=0
+  const tempBox = new THREE.Box3().setFromObject(originalMesh);
+  originalMesh.position.y -= tempBox.min.y;
+  modelGroup.add(originalMesh);
+
+  // ── Squished mesh ──
+  const squishGeo = originalGeometry.clone();
+  // Apply rotation to geometry directly for squish computation
+  squishGeo.applyQuaternion(rotationQuat);
+  squishGeo.computeBoundingBox();
+  const squishBoxMin = squishGeo.boundingBox.min.y;
+
+  // Squish: compress in Y
+  const posAttr = squishGeo.getAttribute('position');
+  const positions = posAttr.array;
+  const squishBox = squishGeo.boundingBox;
+  const height = squishBox.max.y - squishBox.min.y;
+
+  for (let i = 0; i < positions.length; i += 3) {
+    const y = positions[i + 1];
+    // Linear compression toward the base
+    const t = (y - squishBox.min.y) / height; // 0 at base, 1 at top
+    positions[i + 1] = squishBox.min.y + t * height * (1 - squishPct);
+  }
+  posAttr.needsUpdate = true;
+  squishGeo.computeVertexNormals();
+  squishGeo.computeBoundingBox();
+
+  const squishMat = new THREE.MeshPhysicalMaterial({
+    color: 0xe94560,
+    transparent: true,
+    opacity: 0.5,
+    side: THREE.DoubleSide,
+    roughness: 0.4,
+    metalness: 0.1,
+  });
+  squishMesh = new THREE.Mesh(squishGeo, squishMat);
+  // Shift so base sits on Y=0
+  squishMesh.position.y -= squishGeo.boundingBox.min.y;
+  modelGroup.add(squishMesh);
+
+  // ── Flash geometry ──
+  // Pass the same Y offset as squishMesh so flash aligns with the base
+  const baseYOffset = -squishGeo.boundingBox.min.y;
+  buildFlashGeometry(squishGeo, flashWidth, flashHeight, baseYOffset);
+
+  // ── Build platform ──
+  const platSize = boundingSize * 2;
+  const platGeo = new THREE.BoxGeometry(platSize, 0.02 * boundingSize, platSize);
+  const platMat = new THREE.MeshPhysicalMaterial({
+    color: 0x4682dc,
+    transparent: true,
+    opacity: 0.3,
+    roughness: 0.8,
+  });
+  platformMesh = new THREE.Mesh(platGeo, platMat);
+  platformMesh.position.y = -0.01 * boundingSize;
+  modelGroup.add(platformMesh);
+
+  // ── Arrow showing build direction ──
+  const arrowOrigin = new THREE.Vector3(
+    0,
+    (squishGeo.boundingBox.max.y - squishGeo.boundingBox.min.y) + squishMesh.position.y + boundingSize * 0.3,
+    0
+  );
+  arrowHelper = new THREE.ArrowHelper(
+    new THREE.Vector3(0, 1, 0),
+    arrowOrigin,
+    boundingSize * 0.4,
+    0x00ff88,
+    boundingSize * 0.08,
+    boundingSize * 0.05
+  );
+  modelGroup.add(arrowHelper);
+}
+
+function buildFlashGeometry(squishGeo, flashWidth, flashHeight, baseYOffset) {
+  if (flashWidth <= 0) return;
+
+  const positions = squishGeo.getAttribute('position').array;
+  const bbox = squishGeo.boundingBox;
+  const baseY = bbox.min.y;
+  const totalHeight = bbox.max.y - bbox.min.y;
+
+  // Collect base vertices near the bottom
+  let basePoints2D = [];
+  const thresholds = [
+    totalHeight * 0.01 + 0.001,
+    totalHeight * 0.03 + 0.01,
+    totalHeight * 0.08 + 0.05,
+  ];
+  for (const threshold of thresholds) {
+    basePoints2D = [];
+    for (let i = 0; i < positions.length; i += 3) {
+      const y = positions[i + 1];
+      if (y - baseY < threshold && y - baseY >= 0) {
+        basePoints2D.push(new THREE.Vector2(positions[i], positions[i + 2]));
+      }
+    }
+    if (basePoints2D.length >= 3) break;
+  }
+  if (basePoints2D.length < 3) return;
+
+  // Extract the actual concave perimeter using a 2D grid marching approach
+  const perimeter = extractConcavePerimeter(basePoints2D, flashWidth);
+  if (perimeter.length < 3) return;
+
+  // Resample perimeter to even spacing for smooth flash
+  const resampled = resamplePerimeter(perimeter, Math.max(60, perimeter.length));
+
+  // Compute per-vertex outward normals for the perimeter
+  const normals2D = computePerimeterNormals(resampled);
+
+  // Build outer edge with wavy/organic offset (fried-egg look)
+  const outerEdge = [];
+  const nPts = resampled.length;
+  for (let i = 0; i < nPts; i++) {
+    const p = resampled[i];
+    const n = normals2D[i];
+    // Organic noise: combine multiple frequencies for natural look
+    const t = i / nPts;
+    const noise = wavyNoise(t, nPts, flashWidth);
+    const offset = flashWidth + noise;
+    outerEdge.push(new THREE.Vector2(
+      p.x + n.x * offset,
+      p.y + n.y * offset
+    ));
+  }
+
+  // Build flash ring mesh
+  const flashVerts = [];
+  const ringBottom = baseY;
+  const ringTop = baseY + flashHeight;
+
+  for (let i = 0; i < nPts; i++) {
+    const i2 = (i + 1) % nPts;
+    const inner1 = resampled[i], inner2 = resampled[i2];
+    const outer1 = outerEdge[i], outer2 = outerEdge[i2];
+
+    // Varying flash height for organic feel
+    const t1 = i / nPts, t2 = i2 / nPts;
+    const hNoise1 = 1.0 + 0.3 * Math.sin(t1 * Math.PI * 12.7) * Math.cos(t1 * Math.PI * 5.3);
+    const hNoise2 = 1.0 + 0.3 * Math.sin(t2 * Math.PI * 12.7) * Math.cos(t2 * Math.PI * 5.3);
+    const top1 = baseY + flashHeight * hNoise1;
+    const top2 = baseY + flashHeight * hNoise2;
+
+    // Top face (two triangles, use varying height at outer edge)
+    flashVerts.push(inner1.x, ringTop, inner1.y);
+    flashVerts.push(outer1.x, top1, outer1.y);
+    flashVerts.push(inner2.x, ringTop, inner2.y);
+
+    flashVerts.push(inner2.x, ringTop, inner2.y);
+    flashVerts.push(outer1.x, top1, outer1.y);
+    flashVerts.push(outer2.x, top2, outer2.y);
+
+    // Bottom face
+    flashVerts.push(inner1.x, ringBottom, inner1.y);
+    flashVerts.push(inner2.x, ringBottom, inner2.y);
+    flashVerts.push(outer1.x, ringBottom, outer1.y);
+
+    flashVerts.push(inner2.x, ringBottom, inner2.y);
+    flashVerts.push(outer2.x, ringBottom, outer2.y);
+    flashVerts.push(outer1.x, ringBottom, outer1.y);
+
+    // Outer wall
+    flashVerts.push(outer1.x, ringBottom, outer1.y);
+    flashVerts.push(outer2.x, ringBottom, outer2.y);
+    flashVerts.push(outer1.x, top1, outer1.y);
+
+    flashVerts.push(outer2.x, ringBottom, outer2.y);
+    flashVerts.push(outer2.x, top2, outer2.y);
+    flashVerts.push(outer1.x, top1, outer1.y);
+
+    // Inner wall
+    flashVerts.push(inner1.x, ringBottom, inner1.y);
+    flashVerts.push(inner1.x, ringTop, inner1.y);
+    flashVerts.push(inner2.x, ringBottom, inner2.y);
+
+    flashVerts.push(inner2.x, ringBottom, inner2.y);
+    flashVerts.push(inner1.x, ringTop, inner1.y);
+    flashVerts.push(inner2.x, ringTop, inner2.y);
+  }
+
+  const flashGeo = new THREE.BufferGeometry();
+  flashGeo.setAttribute('position', new THREE.Float32BufferAttribute(flashVerts, 3));
+  flashGeo.computeVertexNormals();
+
+  const flashMat = new THREE.MeshPhysicalMaterial({
+    color: 0xff6b35,
+    transparent: true,
+    opacity: 0.75,
+    side: THREE.DoubleSide,
+    roughness: 0.6,
+  });
+
+  flashMesh = new THREE.Mesh(flashGeo, flashMat);
+  flashMesh.position.y = baseYOffset;
+  modelGroup.add(flashMesh);
+}
+
+// ─── Wavy noise for fried-egg flash edges ────────────────────────────
+function wavyNoise(t, nPts, flashWidth) {
+  // Combine several sine waves at different frequencies for organic look
+  const amp = flashWidth * 0.4;
+  return amp * (
+    0.45 * Math.sin(t * Math.PI * 7.3 + 1.2) +
+    0.30 * Math.sin(t * Math.PI * 13.7 + 3.8) +
+    0.15 * Math.sin(t * Math.PI * 23.1 + 0.5) +
+    0.10 * Math.cos(t * Math.PI * 31.9 + 2.1)
+  );
+}
+
+// ─── Concave perimeter extraction via grid-based alpha shape ─────────
+function extractConcavePerimeter(points2D, resolution) {
+  // Build a 2D occupancy grid, then trace the boundary
+  // Grid cell size controls how concave the boundary can be
+  const cellSize = resolution * 0.5; // half the flash width gives good concavity
+
+  // Compute bounds
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const p of points2D) {
+    if (p.x < minX) minX = p.x;
+    if (p.y < minY) minY = p.y;
+    if (p.x > maxX) maxX = p.x;
+    if (p.y > maxY) maxY = p.y;
+  }
+  // Pad by one cell
+  minX -= cellSize; minY -= cellSize; maxX += cellSize; maxY += cellSize;
+
+  const nx = Math.ceil((maxX - minX) / cellSize) + 1;
+  const ny = Math.ceil((maxY - minY) / cellSize) + 1;
+
+  // Clamp grid to reasonable size
+  if (nx * ny > 500000) {
+    // Fall back to convex hull for very large grids
+    return convexHull2D(points2D);
+  }
+
+  const grid = new Uint8Array(nx * ny); // 0 = empty, 1 = filled
+
+  // Fill grid cells that contain points
+  for (const p of points2D) {
+    const gx = Math.floor((p.x - minX) / cellSize);
+    const gy = Math.floor((p.y - minY) / cellSize);
+    if (gx >= 0 && gx < nx && gy >= 0 && gy < ny) {
+      grid[gy * nx + gx] = 1;
+    }
+  }
+
+  // Dilate by 1 cell to fill small gaps between adjacent triangles
+  const dilated = new Uint8Array(nx * ny);
+  for (let y = 0; y < ny; y++) {
+    for (let x = 0; x < nx; x++) {
+      if (grid[y * nx + x]) {
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            const nx2 = x + dx, ny2 = y + dy;
+            if (nx2 >= 0 && nx2 < nx && ny2 >= 0 && ny2 < ny) {
+              dilated[ny2 * nx + nx2] = 1;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // Flood-fill the exterior (from grid edges) to find inside vs outside
+  const exterior = new Uint8Array(nx * ny);
+  const queue = [];
+  // Seed from all edge cells that are empty
+  for (let x = 0; x < nx; x++) {
+    if (!dilated[x]) { exterior[x] = 1; queue.push(x); } // top row (y=0)
+    const bot = (ny-1) * nx + x;
+    if (!dilated[bot]) { exterior[bot] = 1; queue.push(bot); }
+  }
+  for (let y = 1; y < ny - 1; y++) {
+    const left = y * nx;
+    if (!dilated[left]) { exterior[left] = 1; queue.push(left); }
+    const right = y * nx + (nx - 1);
+    if (!dilated[right]) { exterior[right] = 1; queue.push(right); }
+  }
+  // BFS flood fill
+  let qi = 0;
+  while (qi < queue.length) {
+    const idx = queue[qi++];
+    const x = idx % nx, y = Math.floor(idx / nx);
+    const neighbors = [[x-1,y],[x+1,y],[x,y-1],[x,y+1]];
+    for (const [nx2, ny2] of neighbors) {
+      if (nx2 >= 0 && nx2 < nx && ny2 >= 0 && ny2 < ny) {
+        const nIdx = ny2 * nx + nx2;
+        if (!exterior[nIdx] && !dilated[nIdx]) {
+          exterior[nIdx] = 1;
+          queue.push(nIdx);
+        }
+      }
+    }
+  }
+
+  // Boundary cells: filled cells adjacent to exterior
+  const boundaryPts = [];
+  for (let y = 0; y < ny; y++) {
+    for (let x = 0; x < nx; x++) {
+      if (!dilated[y * nx + x]) continue;
+      // Check if any neighbor is exterior
+      let onBoundary = false;
+      for (const [dx, dy] of [[-1,0],[1,0],[0,-1],[0,1]]) {
+        const nx2 = x + dx, ny2 = y + dy;
+        if (nx2 < 0 || nx2 >= nx || ny2 < 0 || ny2 >= ny || exterior[ny2 * nx + nx2]) {
+          onBoundary = true;
+          break;
+        }
+      }
+      if (onBoundary) {
+        boundaryPts.push(new THREE.Vector2(
+          minX + (x + 0.5) * cellSize,
+          minY + (y + 0.5) * cellSize
+        ));
+      }
+    }
+  }
+
+  if (boundaryPts.length < 3) return convexHull2D(points2D);
+
+  // Order the boundary points into a closed loop by nearest-neighbor walk
+  return orderBoundaryPoints(boundaryPts);
+}
+
+function orderBoundaryPoints(pts) {
+  // Greedy nearest-neighbor ordering
+  const ordered = [];
+  const used = new Uint8Array(pts.length);
+  // Start from the point with smallest x (leftmost)
+  let startIdx = 0;
+  for (let i = 1; i < pts.length; i++) {
+    if (pts[i].x < pts[startIdx].x || (pts[i].x === pts[startIdx].x && pts[i].y < pts[startIdx].y)) {
+      startIdx = i;
+    }
+  }
+  ordered.push(pts[startIdx]);
+  used[startIdx] = 1;
+
+  for (let step = 1; step < pts.length; step++) {
+    const last = ordered[ordered.length - 1];
+    let bestDist = Infinity;
+    let bestIdx = -1;
+    for (let i = 0; i < pts.length; i++) {
+      if (used[i]) continue;
+      const dx = pts[i].x - last.x, dy = pts[i].y - last.y;
+      const d = dx * dx + dy * dy;
+      if (d < bestDist) { bestDist = d; bestIdx = i; }
+    }
+    if (bestIdx === -1) break;
+    ordered.push(pts[bestIdx]);
+    used[bestIdx] = 1;
+  }
+  return ordered;
+}
+
+// ─── Resample a closed perimeter to N evenly spaced points ──────────
+function resamplePerimeter(pts, targetN) {
+  if (pts.length <= 3) return pts;
+
+  // Compute total perimeter length
+  let totalLen = 0;
+  const n = pts.length;
+  const segLens = [];
+  for (let i = 0; i < n; i++) {
+    const next = pts[(i + 1) % n];
+    const len = pts[i].distanceTo(next);
+    segLens.push(len);
+    totalLen += len;
+  }
+
+  if (totalLen < 1e-10) return pts;
+
+  const step = totalLen / targetN;
+  const result = [];
+  let segIdx = 0, segT = 0;
+
+  for (let i = 0; i < targetN; i++) {
+    const dist = i * step;
+    // Walk along segments to find position at dist
+    let walked = 0;
+    segIdx = 0; segT = 0;
+    let remaining = dist;
+    while (segIdx < n && remaining > segLens[segIdx] + 1e-10) {
+      remaining -= segLens[segIdx];
+      segIdx++;
+    }
+    if (segIdx >= n) segIdx = n - 1;
+    const segLen = segLens[segIdx];
+    segT = segLen > 1e-10 ? remaining / segLen : 0;
+    segT = Math.min(1, Math.max(0, segT));
+
+    const a = pts[segIdx];
+    const b = pts[(segIdx + 1) % n];
+    result.push(new THREE.Vector2(
+      a.x + (b.x - a.x) * segT,
+      a.y + (b.y - a.y) * segT
+    ));
+  }
+  return result;
+}
+
+// ─── Compute outward normals for a closed 2D perimeter ──────────────
+function computePerimeterNormals(pts) {
+  const n = pts.length;
+  // Compute centroid to determine "outward" direction
+  const cx = pts.reduce((s, p) => s + p.x, 0) / n;
+  const cy = pts.reduce((s, p) => s + p.y, 0) / n;
+
+  const normals = [];
+  for (let i = 0; i < n; i++) {
+    const prev = pts[(i - 1 + n) % n];
+    const next = pts[(i + 1) % n];
+    // Tangent direction
+    const tx = next.x - prev.x, ty = next.y - prev.y;
+    const len = Math.sqrt(tx * tx + ty * ty) || 1;
+    // Normal (perpendicular to tangent)
+    let nx = -ty / len, ny = tx / len;
+    // Ensure it points outward (away from centroid)
+    const toCentX = cx - pts[i].x, toCentY = cy - pts[i].y;
+    if (nx * toCentX + ny * toCentY > 0) { nx = -nx; ny = -ny; }
+    normals.push(new THREE.Vector2(nx, ny));
+  }
+  return normals;
+}
+
+// ─── Convex Hull (Graham scan) — kept as fallback ────────────────────
+function convexHull2D(points) {
+  const eps = 0.0001;
+  const unique = [];
+  for (const p of points) {
+    let dup = false;
+    for (const u of unique) {
+      if (Math.abs(p.x - u.x) < eps && Math.abs(p.y - u.y) < eps) { dup = true; break; }
+    }
+    if (!dup) unique.push(p.clone());
+  }
+
+  if (unique.length < 3) return unique;
+
+  unique.sort((a, b) => a.y - b.y || a.x - b.x);
+  const pivot = unique[0];
+
+  const rest = unique.slice(1);
+  rest.sort((a, b) => {
+    const angleA = Math.atan2(a.y - pivot.y, a.x - pivot.x);
+    const angleB = Math.atan2(b.y - pivot.y, b.x - pivot.x);
+    if (Math.abs(angleA - angleB) < 1e-10) {
+      return a.distanceTo(pivot) - b.distanceTo(pivot);
+    }
+    return angleA - angleB;
+  });
+
+  const stack = [pivot, rest[0]];
+  for (let i = 1; i < rest.length; i++) {
+    while (stack.length > 1 && cross2D(stack[stack.length - 2], stack[stack.length - 1], rest[i]) <= 0) {
+      stack.pop();
+    }
+    stack.push(rest[i]);
+  }
+  return stack;
+}
+
+function cross2D(o, a, b) {
+  return (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+}
+
+// ─── Face Click (Raycasting) ─────────────────────────────────────────
+function onCanvasClick(event) {
+  if (!originalMesh) return;
+
+  const rect = renderer.domElement.getBoundingClientRect();
+  mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+  mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+  raycaster.setFromCamera(mouse, camera);
+
+  // Raycast against the original (ghost) mesh and the squished mesh
+  const targets = [originalMesh, squishMesh].filter(Boolean);
+  const intersects = raycaster.intersectObjects(targets);
+
+  if (intersects.length > 0) {
+    const hit = intersects[0];
+    const faceNormal = hit.face.normal.clone();
+
+    // Transform normal from local mesh space to world space
+    const normalMatrix = new THREE.Matrix3().getNormalMatrix(hit.object.matrixWorld);
+    faceNormal.applyMatrix3(normalMatrix).normalize();
+
+    // The clicked face normal should become the "down" direction (base normal)
+    // We want that face to sit on the platform
+    baseNormal.copy(faceNormal).negate();
+
+    // But we need the base normal in original geometry space (before rotation)
+    // Since originalMesh has rotationQuat applied, we need to undo it
+    // Actually, let's re-derive: the user clicked a face, its world-space normal
+    // indicates the face direction. We want that face pointing down.
+    // So the base normal (in original space) is the original face normal.
+    // Let's get the face normal in original geometry space.
+    const origNormalMatrix = new THREE.Matrix3().getNormalMatrix(originalMesh.matrixWorld);
+    const invNormalMatrix = origNormalMatrix.clone().invert();
+    const origSpaceNormal = faceNormal.clone().applyMatrix3(invNormalMatrix).normalize();
+
+    // The base normal should be this face's direction in original space
+    // But it's simpler: after rotation, the face normal is in world space.
+    // We want to rotate the model so this face points down (-Y).
+    // So baseNormal = the face normal in original geometry coords.
+    // Since originalMesh.quaternion = rotationQuat, and the geometry is the original,
+    // the face normal in original space is: inverse(rotationQuat) * worldNormal
+    const invQuat = originalMesh.quaternion.clone().invert();
+    const originalFaceNormal = faceNormal.clone().applyQuaternion(invQuat).normalize();
+
+    baseNormal.copy(originalFaceNormal);
+
+    clearActiveAxisButtons();
+    rebuildVisualization();
+    try { runDesignCheck(); } catch(e) { console.error('Design check error:', e); }
+    toast('Base set from clicked face');
+  }
+}
+
+// ─── UI Wiring ───────────────────────────────────────────────────────
+function setActiveAxisButton(axis) {
+  document.querySelectorAll('.axis-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.axis === axis);
+  });
+}
+
+function clearActiveAxisButtons() {
+  document.querySelectorAll('.axis-btn').forEach(btn => btn.classList.remove('active'));
+}
+
+document.querySelectorAll('.axis-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const axis = btn.dataset.axis;
+    const map = {
+      '+y': new THREE.Vector3(0, 1, 0),
+      '-y': new THREE.Vector3(0, -1, 0),
+      '+x': new THREE.Vector3(1, 0, 0),
+      '-x': new THREE.Vector3(-1, 0, 0),
+      '+z': new THREE.Vector3(0, 0, 1),
+      '-z': new THREE.Vector3(0, 0, -1),
+    };
+    baseNormal.copy(map[axis]);
+    setActiveAxisButton(axis);
+    rebuildVisualization();
+    try { runDesignCheck(); } catch(e) { console.error('Design check error:', e); }
+    toast(`Base set to ${btn.textContent.trim()}`);
+  });
+});
+
+// Sliders
+document.getElementById('squish-slider').addEventListener('input', (e) => {
+  document.getElementById('squish-value').textContent = e.target.value + '%';
+  rebuildVisualization();
+});
+
+document.getElementById('flash-slider').addEventListener('input', (e) => {
+  document.getElementById('flash-value').textContent = parseFloat(e.target.value).toFixed(2) + 'mm';
+  rebuildVisualization();
+});
+
+document.getElementById('flash-height-slider').addEventListener('input', (e) => {
+  document.getElementById('flash-height-value').textContent = parseFloat(e.target.value).toFixed(2) + 'mm';
+  rebuildVisualization();
+});
+
+document.getElementById('reset-btn').addEventListener('click', () => {
+  const dist = boundingSize * 2.2;
+  camera.position.set(dist * 0.7, dist * 0.6, dist * 0.9);
+  controls.target.set(0, 0, 0);
+  controls.update();
+});
+
+// Drag and drop
+const dropzone = document.getElementById('dropzone');
+
+['dragenter', 'dragover'].forEach(evt => {
+  dropzone.addEventListener(evt, (e) => {
+    e.preventDefault();
+    dropzone.classList.add('dragover');
+  });
+});
+
+['dragleave', 'drop'].forEach(evt => {
+  dropzone.addEventListener(evt, () => {
+    dropzone.classList.remove('dragover');
+  });
+});
+
+dropzone.addEventListener('drop', (e) => {
+  e.preventDefault();
+  const file = e.dataTransfer.files[0];
+  if (file) handleFile(file);
+});
+
+document.getElementById('file-input').addEventListener('change', (e) => {
+  if (e.target.files[0]) handleFile(e.target.files[0]);
+});
+
+// Also allow drop on viewport after first load
+document.getElementById('viewport').addEventListener('dragover', (e) => e.preventDefault());
+document.getElementById('viewport').addEventListener('drop', (e) => {
+  e.preventDefault();
+  const file = e.dataTransfer.files[0];
+  if (file) {
+    document.getElementById('dropzone').classList.remove('hidden');
+    handleFile(file);
+  }
+});
+
+function handleFile(file) {
+  if (!file.name.toLowerCase().endsWith('.stl')) {
+    toast('Please select an STL file');
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = (e) => loadSTL(e.target.result);
+  reader.readAsArrayBuffer(file);
+}
+
+// Toast notification
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(el._timer);
+  el._timer = setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+// ─── Design Rules ─────────────────────────────────────────────────────
+const BMF_RULES = {
+  buildVolume: { x: 94, y: 52, z: 45 },  // mm
+  minVolume: 1,           // mm³ (minimum part size)
+  minFeatureSize: 0.05,   // mm
+  minHoleDiaVert: 0.05,   // mm
+  minHoleDiaHoriz: 0.15,  // mm
+  minWallSupported: 0.05, // mm
+  minWallUnsupported: 0.1,// mm
+  minOverhangAngle: 30,   // degrees
+  maxBridgedOverhang: 1.5,// mm
+  maxUnbridgedOverhang: 0.3, // mm
+  aspectRatioChannels: 100,
+  aspectRatioPins: 40,
+  minFeatureClearance: 0.1, // mm
+  minPartSpacing: 0.1,   // mm
+  layerHeightMin: 0.01,  // mm
+  layerHeightMax: 0.05,  // mm
+  supportConeTopMin: 0.08,  // mm
+  supportConeTopMax: 0.2,   // mm
+  supportConeBaseMin: 0.1,  // mm
+  supportConeBaseMax: 1.0,  // mm
+};
+
+let partScale = 1; // multiplier to convert STL units to mm
+let overhangMesh = null; // colored overhang visualization
+
+function getPartScale() {
+  // Try drawer select first, fall back to side panel select
+  const sel = document.getElementById('drawer-unit-select') || document.getElementById('unit-select');
+  if (!sel) return 1;
+  if (sel.value === 'custom') {
+    const cus = document.getElementById('drawer-custom-scale') || document.getElementById('custom-scale');
+    return parseFloat(cus?.value) || 1;
+  }
+  return parseFloat(sel.value) || 1;
+}
+
+function getScaledDimensions() {
+  if (!originalGeometry) return null;
+  const box = originalGeometry.boundingBox;
+  const size = new THREE.Vector3();
+  box.getSize(size);
+  const s = getPartScale();
+  return { x: size.x * s, y: size.y * s, z: size.z * s };
+}
+
+// Compute signed volume of a triangle mesh
+function computeMeshVolume(geometry) {
+  const pos = geometry.getAttribute('position').array;
+  let volume = 0;
+  for (let i = 0; i < pos.length; i += 9) {
+    const ax = pos[i],   ay = pos[i+1], az = pos[i+2];
+    const bx = pos[i+3], by = pos[i+4], bz = pos[i+5];
+    const cx = pos[i+6], cy = pos[i+7], cz = pos[i+8];
+    volume += (ax * (by * cz - bz * cy) +
+               bx * (cy * az - cz * ay) +
+               cx * (ay * bz - az * by)) / 6.0;
+  }
+  return Math.abs(volume);
+}
+
+// Estimate minimum wall thickness via ray sampling
+function estimateMinWallThickness(geometry, numSamples) {
+  const pos = geometry.getAttribute('position').array;
+  const totalTris = pos.length / 9;
+  if (totalTris === 0) return Infinity;
+
+  // Compute bounding diagonal for adaptive thresholds
+  const tempGeo = geometry.clone();
+  tempGeo.computeBoundingBox();
+  const bboxSize = new THREE.Vector3();
+  tempGeo.boundingBox.getSize(bboxSize);
+  const diagLen = bboxSize.length();
+  // Minimum meaningful distance: skip hits closer than 0.5% of diagonal
+  // This avoids self-hits and adjacent-face hits on the same surface
+  const minDist = diagLen * 0.005;
+  // Offset origin by a bit more to clear the source face
+  const originOffset = diagLen * 0.002;
+
+  const rc = new THREE.Raycaster();
+  const tempMesh = new THREE.Mesh(tempGeo, new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));
+  tempMesh.updateMatrixWorld(true);
+
+  const measurements = [];
+  const step = Math.max(1, Math.floor(totalTris / numSamples));
+
+  for (let t = 0; t < totalTris; t += step) {
+    const i = t * 9;
+    if (i + 8 >= pos.length) break;
+    const a = new THREE.Vector3(pos[i], pos[i+1], pos[i+2]);
+    const b = new THREE.Vector3(pos[i+3], pos[i+4], pos[i+5]);
+    const c = new THREE.Vector3(pos[i+6], pos[i+7], pos[i+8]);
+
+    const centroid = new THREE.Vector3().addVectors(a, b).add(c).divideScalar(3);
+
+    const ab = new THREE.Vector3().subVectors(b, a);
+    const ac = new THREE.Vector3().subVectors(c, a);
+    const cross = new THREE.Vector3().crossVectors(ab, ac);
+    if (cross.lengthSq() < 1e-12) continue;
+    const normal = cross.normalize();
+
+    // Cast ray inward (opposite of face normal)
+    const inward = normal.clone().negate();
+    const origin = centroid.clone().addScaledVector(inward, originOffset);
+    rc.set(origin, inward);
+    rc.far = diagLen * 2;
+
+    try {
+      const hits = rc.intersectObject(tempMesh, false);
+      // Find the first hit that's far enough to be a real opposing wall
+      for (const hit of hits) {
+        if (hit.distance > minDist) {
+          measurements.push(hit.distance);
+          break;
+        }
+      }
+    } catch(e) { /* skip */ }
+  }
+
+  tempGeo.dispose();
+
+  if (measurements.length === 0) return Infinity;
+
+  // Use the 5th percentile instead of absolute min to avoid noise
+  measurements.sort((a, b) => a - b);
+  const p5Index = Math.floor(measurements.length * 0.05);
+  return measurements[Math.max(0, p5Index)];
+}
+
+// Analyze overhangs — returns per-face angle data and builds colored mesh
+// Distinguishes bridged overhangs (nearby support within bridgeDist) from
+// truly unsupported overhangs.
+function analyzeOverhangs(geometry, buildDir, bridgeDistMM) {
+  // bridgeDistMM: max distance (in model units) for a face to be considered bridged
+  const pos = geometry.getAttribute('position').array;
+  const totalTris = pos.length / 9;
+  const colors = new Float32Array(pos.length); // 1 color per vertex
+
+  const downDir = buildDir.clone().negate();
+
+  // First pass: classify each triangle and compute centroids
+  const faceInfo = new Array(totalTris);
+  for (let t = 0; t < totalTris; t++) {
+    const i = t * 9;
+    const ax = pos[i], ay = pos[i+1], az = pos[i+2];
+    const bx = pos[i+3], by = pos[i+4], bz = pos[i+5];
+    const cx = pos[i+6], cy = pos[i+7], cz = pos[i+8];
+
+    const ab = new THREE.Vector3(bx-ax, by-ay, bz-az);
+    const ac = new THREE.Vector3(cx-ax, cy-ay, cz-az);
+    const normal = new THREE.Vector3().crossVectors(ab, ac).normalize();
+
+    const dotDown = normal.dot(downDir);
+    const angleFromHorizontal = Math.asin(Math.abs(normal.dot(buildDir))) * (180 / Math.PI);
+
+    // Centroid projected onto horizontal plane (XZ)
+    const centX = (ax + bx + cx) / 3;
+    const centY = (ay + by + cy) / 3;
+    const centZ = (az + bz + cz) / 3;
+
+    // Classify: 'severe' (<30°), 'marginal' (30-45°), 'safe' (>=45° or upward)
+    let cat = 'safe';
+    if (dotDown > 0.01) {
+      if (angleFromHorizontal < 30) cat = 'severe';
+      else if (angleFromHorizontal < 45) cat = 'marginal';
+    }
+
+    faceInfo[t] = { cat, centX, centY, centZ, idx: i };
+  }
+
+  // Second pass: build a spatial grid of NON-overhanging face centroids (XZ plane)
+  // so we can quickly check if a severe overhang face is near supported geometry
+  const bridgeDist = bridgeDistMM || 1.5; // model-unit distance for bridging
+  const cellSize = bridgeDist;
+  const supportGrid = new Map(); // "gx,gz" -> [{centX, centY, centZ}]
+
+  for (let t = 0; t < totalTris; t++) {
+    const f = faceInfo[t];
+    if (f.cat === 'severe') continue; // only index non-severe faces as potential support
+    const gx = Math.floor(f.centX / cellSize);
+    const gz = Math.floor(f.centZ / cellSize);
+    const key = gx + ',' + gz;
+    if (!supportGrid.has(key)) supportGrid.set(key, []);
+    supportGrid.get(key).push(f);
+  }
+
+  function hasSupportNearby(fx, fy, fz) {
+    const gx = Math.floor(fx / cellSize);
+    const gz = Math.floor(fz / cellSize);
+    const bridgeDist2 = bridgeDist * bridgeDist;
+    // Check 3x3 neighborhood of grid cells
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dz = -1; dz <= 1; dz++) {
+        const key = (gx + dx) + ',' + (gz + dz);
+        const cell = supportGrid.get(key);
+        if (!cell) continue;
+        for (const s of cell) {
+          // 3D distance — a face is bridged if there's support geometry nearby
+          const ddx = s.centX - fx, ddy = s.centY - fy, ddz = s.centZ - fz;
+          if (ddx*ddx + ddy*ddy + ddz*ddz <= bridgeDist2) return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  // Third pass: for severe overhangs, check bridging; assign colors
+  let overhangBridged = 0;   // severe overhangs with support nearby (warn)
+  let overhangUnbridged = 0; // severe overhangs with no support nearby (fail)
+  let overhanging45 = 0;
+  let maxOverhangLength = 0;
+
+  for (let t = 0; t < totalTris; t++) {
+    const f = faceInfo[t];
+    const i = f.idx;
+    let r, g, bl;
+
+    if (f.cat === 'severe') {
+      const bridged = hasSupportNearby(f.centX, f.centY, f.centZ);
+      if (bridged) {
+        // Bridged overhang — warning (yellow)
+        r = 0.84; g = 0.62; bl = 0.18;
+        overhangBridged++;
+      } else {
+        // Unbridged overhang — fail (red)
+        r = 0.9; g = 0.24; bl = 0.24;
+        overhangUnbridged++;
+      }
+      // Track max triangle span for overhang extent
+      const ax = pos[i], ay = pos[i+1], az = pos[i+2];
+      const bx = pos[i+3], by = pos[i+4], bz = pos[i+5];
+      const cx = pos[i+6], cy = pos[i+7], cz = pos[i+8];
+      const ab = Math.sqrt((bx-ax)**2 + (by-ay)**2 + (bz-az)**2);
+      const bc = Math.sqrt((cx-bx)**2 + (cy-by)**2 + (cz-bz)**2);
+      const ca = Math.sqrt((ax-cx)**2 + (ay-cy)**2 + (az-cz)**2);
+      const triWidth = Math.max(ab, bc, ca);
+      if (triWidth > maxOverhangLength) maxOverhangLength = triWidth;
+    } else if (f.cat === 'marginal') {
+      r = 0.84; g = 0.62; bl = 0.18;
+      overhanging45++;
+    } else {
+      r = 0.22; g = 0.63; bl = 0.41;
+    }
+
+    for (let v = 0; v < 3; v++) {
+      colors[i + v * 3]     = r;
+      colors[i + v * 3 + 1] = g;
+      colors[i + v * 3 + 2] = bl;
+    }
+  }
+
+  return {
+    colors,
+    overhangBridged,
+    overhangUnbridged,
+    overhanging30: overhangBridged + overhangUnbridged, // total severe
+    overhanging45,
+    totalTris,
+    maxOverhangLength,
+  };
+}
+
+// Find minimum edge length in the mesh (proxy for minimum feature size)
+function findMinEdgeLength(geometry) {
+  const pos = geometry.getAttribute('position').array;
+  const totalTris = pos.length / 9;
+  let minEdge = Infinity;
+  const step = Math.max(1, Math.floor(totalTris / 500)); // sample
+
+  for (let t = 0; t < totalTris; t += step) {
+    const i = t * 9;
+    const a = new THREE.Vector3(pos[i], pos[i+1], pos[i+2]);
+    const b = new THREE.Vector3(pos[i+3], pos[i+4], pos[i+5]);
+    const c = new THREE.Vector3(pos[i+6], pos[i+7], pos[i+8]);
+
+    const ab = a.distanceTo(b);
+    const bc = b.distanceTo(c);
+    const ca = c.distanceTo(a);
+    const localMin = Math.min(ab, bc, ca);
+    if (localMin > 0.00001 && localMin < minEdge) minEdge = localMin;
+  }
+  return minEdge;
+}
+
+function runDesignCheck() {
+  if (!originalGeometry) return;
+
+  try { _runDesignCheckInner(); } catch(e) {
+    console.error('Design check failed:', e);
+    document.getElementById('check-results').innerHTML =
+      `<p style="color:#fc8181;font-size:12px">Error during analysis: ${e.message}</p>`;
+  }
+}
+
+function _runDesignCheckInner() {
+  const s = getPartScale();
+  const dims = getScaledDimensions();
+  const R = BMF_RULES;
+  const results = [];
+
+  // 1. Build volume check
+  // After rotation, the part sits in a certain orientation. Check against build volume.
+  const sortedDims = [dims.x, dims.y, dims.z].sort((a, b) => b - a);
+  const buildVol = [R.buildVolume.x, R.buildVolume.y, R.buildVolume.z].sort((a, b) => b - a);
+  const fitsBuildVol = sortedDims[0] <= buildVol[0] && sortedDims[1] <= buildVol[1] && sortedDims[2] <= buildVol[2];
+
+  results.push({
+    rule: 'Part size vs build volume',
+    limit: `${R.buildVolume.x} × ${R.buildVolume.y} × ${R.buildVolume.z} mm`,
+    measured: `${dims.x.toFixed(2)} × ${dims.y.toFixed(2)} × ${dims.z.toFixed(2)} mm`,
+    status: fitsBuildVol ? 'pass' : 'fail',
+  });
+
+  // 2. Minimum volume
+  const rawVolume = computeMeshVolume(originalGeometry);
+  const volume = rawVolume * s * s * s;
+  results.push({
+    rule: 'Minimum part volume',
+    limit: `≥ ${R.minVolume} mm³`,
+    measured: `${volume.toFixed(4)} mm³`,
+    status: volume >= R.minVolume ? 'pass' : (volume >= R.minVolume * 0.5 ? 'warn' : 'fail'),
+  });
+
+  // 3. Minimum edge length (proxy for feature size)
+  const minEdge = findMinEdgeLength(originalGeometry) * s;
+  results.push({
+    rule: 'Smallest mesh edge (feature size proxy)',
+    limit: `≥ ${R.minFeatureSize} mm`,
+    measured: `${minEdge.toFixed(4)} mm`,
+    status: minEdge >= R.minFeatureSize ? 'pass' : 'warn',
+  });
+
+  // 4. Wall thickness estimate
+  const wallThickness = estimateMinWallThickness(originalGeometry, 200) * s;
+  if (wallThickness < Infinity) {
+    const wallStatus = wallThickness >= R.minWallUnsupported ? 'pass' :
+                       (wallThickness >= R.minWallSupported ? 'warn' : 'fail');
+    results.push({
+      rule: 'Estimated min wall thickness',
+      limit: `≥ ${R.minWallSupported} mm (supported) / ${R.minWallUnsupported} mm (unsupported)`,
+      measured: `~${wallThickness.toFixed(3)} mm`,
+      status: wallStatus,
+    });
+  } else {
+    results.push({
+      rule: 'Estimated min wall thickness',
+      limit: `≥ ${R.minWallSupported} mm`,
+      measured: 'Could not measure',
+      status: 'na',
+    });
+  }
+
+  // 5. Overhang analysis
+  const buildDir = new THREE.Vector3(0, 1, 0); // after reorientation, build = +Y
+  const targetDown = new THREE.Vector3(0, -1, 0);
+  const rotQuat = new THREE.Quaternion().setFromUnitVectors(baseNormal, targetDown);
+  const rotatedGeo = originalGeometry.clone();
+  rotatedGeo.applyQuaternion(rotQuat);
+
+  // Bridge distance in model units (convert from mm using scale)
+  const bridgeDistModel = R.maxBridgedOverhang / s;
+  const overhangData = analyzeOverhangs(rotatedGeo, buildDir, bridgeDistModel);
+
+  const ovhBridgedPct = ((overhangData.overhangBridged / overhangData.totalTris) * 100).toFixed(1);
+  const ovhUnbridgedPct = ((overhangData.overhangUnbridged / overhangData.totalTris) * 100).toFixed(1);
+  const ovhPct45 = ((overhangData.overhanging45 / overhangData.totalTris) * 100).toFixed(1);
+
+  // Unbridged overhangs — these are true failures (no support within 1.5mm)
+  results.push({
+    rule: `Unsupported overhangs < ${R.minOverhangAngle}°`,
+    limit: `≥ ${R.minOverhangAngle}° (no support within ${R.maxBridgedOverhang} mm)`,
+    measured: `${overhangData.overhangUnbridged} faces (${ovhUnbridgedPct}%)`,
+    status: overhangData.overhangUnbridged === 0 ? 'pass' : 'fail',
+  });
+
+  // Bridged overhangs — warnings (connected geometry within 1.5mm)
+  results.push({
+    rule: `Bridged overhangs < ${R.minOverhangAngle}°`,
+    limit: `Support within ${R.maxBridgedOverhang} mm — printable with care`,
+    measured: `${overhangData.overhangBridged} faces (${ovhBridgedPct}%)`,
+    status: overhangData.overhangBridged === 0 ? 'pass' : 'warn',
+  });
+
+  // Marginal overhangs (30-45°)
+  results.push({
+    rule: 'Marginal overhangs (30°–45°)',
+    limit: 'May need supports',
+    measured: `${overhangData.overhanging45} faces (${ovhPct45}%)`,
+    status: overhangData.overhanging45 === 0 ? 'pass' : 'info',
+  });
+
+  // Max overhang span estimate
+  const maxOvhSpan = overhangData.maxOverhangLength * s;
+  if (overhangData.overhanging30 > 0) {
+    results.push({
+      rule: 'Est. max overhang span',
+      limit: `≤ ${R.maxUnbridgedOverhang} mm unbridged / ${R.maxBridgedOverhang} mm bridged`,
+      measured: `~${maxOvhSpan.toFixed(3)} mm`,
+      status: maxOvhSpan <= R.maxUnbridgedOverhang ? 'pass' :
+              (maxOvhSpan <= R.maxBridgedOverhang ? 'warn' : 'fail'),
+    });
+  }
+
+  // 7. Aspect ratio check (height / smallest XZ dimension)
+  const minXZ = Math.min(dims.x, dims.z);
+  const partHeight = dims.y;
+  if (minXZ > 0) {
+    const aspectRatio = partHeight / minXZ;
+    results.push({
+      rule: 'Aspect ratio (height / min width)',
+      limit: `≤ 40:1 (pins/pillars)`,
+      measured: `${aspectRatio.toFixed(1)}:1`,
+      status: aspectRatio <= 40 ? 'pass' : 'fail',
+    });
+  }
+
+  // 8. Feature clearance note
+  results.push({
+    rule: 'Min feature clearance',
+    limit: `≥ ${R.minFeatureClearance} mm`,
+    measured: 'Manual check recommended',
+    status: 'info',
+  });
+
+  // 9. Hole diameters note
+  results.push({
+    rule: 'Min hole diameter (vertical / horizontal)',
+    limit: `≥ ${R.minHoleDiaVert} / ${R.minHoleDiaHoriz} mm`,
+    measured: 'Manual check recommended',
+    status: 'info',
+  });
+
+  // Build overhang visualization
+  buildOverhangVisualization(rotatedGeo, overhangData.colors);
+
+  // Render results
+  renderCheckResults(results);
+
+  // Show overhang legend
+  document.getElementById('overhang-legend').style.display = 'flex';
+}
+
+function buildOverhangVisualization(rotatedGeo, colorArray) {
+  // Remove previous overhang mesh
+  if (overhangMesh) {
+    modelGroup.remove(overhangMesh);
+    overhangMesh.geometry.dispose();
+    overhangMesh.material.dispose();
+    overhangMesh = null;
+  }
+
+  const geo = rotatedGeo.clone();
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(colorArray, 3));
+  geo.computeBoundingBox();
+
+  const mat = new THREE.MeshPhysicalMaterial({
+    vertexColors: true,
+    transparent: true,
+    opacity: 0.6,
+    side: THREE.DoubleSide,
+    roughness: 0.5,
+    depthWrite: false,
+  });
+
+  overhangMesh = new THREE.Mesh(geo, mat);
+  // Position same as originalMesh
+  const tempBox = new THREE.Box3().setFromObject(overhangMesh);
+  overhangMesh.position.y -= tempBox.min.y;
+  overhangMesh.position.y += 0.001 * boundingSize; // tiny offset to avoid z-fight
+  modelGroup.add(overhangMesh);
+}
+
+function renderCheckResults(results) {
+  const counts = { pass: 0, warn: 0, fail: 0, info: 0, na: 0 };
+  results.forEach(r => counts[r.status]++);
+
+  const hasIssues = counts.fail > 0 || counts.warn > 0;
+
+  // Build summary HTML
+  const summaryHTML = `
+    <span class="s-item"><span class="s-dot" style="background:#38a169"></span>${counts.pass} pass</span>
+    <span class="s-item"><span class="s-dot" style="background:#d69e2e"></span>${counts.warn} warn</span>
+    <span class="s-item"><span class="s-dot" style="background:#e53e3e"></span>${counts.fail} fail</span>
+    ${counts.info ? `<span class="s-item"><span class="s-dot" style="background:#4a90d9"></span>${counts.info} info</span>` : ''}
+  `;
+
+  // Build table HTML
+  let tableHTML = `<table class="drawer-check-table">
+    <thead><tr><th>Rule</th><th>Limit</th><th>Measured</th><th></th></tr></thead>
+    <tbody>`;
+  for (const r of results) {
+    const label = r.status === 'na' ? 'N/A' : r.status.toUpperCase();
+    tableHTML += `<tr class="status-${r.status}">
+      <td>${r.rule}</td>
+      <td style="color:var(--text-dim)">${r.limit}</td>
+      <td>${r.measured}</td>
+      <td><span class="drawer-badge drawer-badge-${r.status}">${label}</span></td>
+    </tr>`;
+  }
+  tableHTML += '</tbody></table>';
+
+  // Render into drawer
+  const drawerSummary = document.getElementById('drawer-summary');
+  const drawerResults = document.getElementById('drawer-results');
+  const drawerOvhLegend = document.getElementById('drawer-overhang-legend');
+  if (drawerSummary) { drawerSummary.style.display = 'flex'; drawerSummary.innerHTML = summaryHTML; }
+  if (drawerResults) { drawerResults.innerHTML = tableHTML; }
+  if (drawerOvhLegend) { drawerOvhLegend.style.display = 'flex'; }
+
+  // Also render into side panel if those elements exist
+  const spSummary = document.getElementById('check-summary');
+  const spResults = document.getElementById('check-results');
+  const spOvhLegend = document.getElementById('overhang-legend');
+  if (spSummary) { spSummary.style.display = 'flex'; spSummary.innerHTML = summaryHTML; }
+  if (spResults) { spResults.innerHTML = tableHTML; }
+  if (spOvhLegend) { spOvhLegend.style.display = 'flex'; }
+
+  // Update toggle button
+  const toggle = document.getElementById('design-drawer-toggle');
+  if (toggle) {
+    toggle.style.display = 'block';
+    if (hasIssues) {
+      toggle.classList.add('has-issues');
+      toggle.textContent = `DESIGN CHECK: ${counts.fail} FAIL, ${counts.warn} WARN`;
+    } else {
+      toggle.classList.remove('has-issues');
+      toggle.textContent = `DESIGN CHECK: ALL ${counts.pass} PASSED`;
+    }
+  }
+}
+
+// ─── Scale / Unit Controls ────────────────────────────────────────────
+// Wire both the side-panel and drawer unit selects
+function setupUnitSelect(selectId, customId, hintId) {
+  const sel = document.getElementById(selectId);
+  const custom = document.getElementById(customId);
+  const hint = document.getElementById(hintId);
+  if (!sel) return;
+  sel.addEventListener('change', (e) => {
+    if (e.target.value === 'custom') {
+      if (custom) custom.style.display = 'block';
+      if (hint) hint.textContent = '× → mm';
+    } else {
+      if (custom) custom.style.display = 'none';
+      if (hint) hint.textContent = '';
+    }
+    // Sync the other select
+    syncUnitSelects(selectId);
+    updateScaledDimensions();
+  });
+  if (custom) {
+    custom.addEventListener('input', () => {
+      syncUnitSelects(selectId);
+      updateScaledDimensions();
+    });
+  }
+}
+
+function syncUnitSelects(sourceId) {
+  const pairs = [
+    ['unit-select', 'custom-scale'],
+    ['drawer-unit-select', 'drawer-custom-scale'],
+  ];
+  const sourceSelect = document.getElementById(sourceId);
+  if (!sourceSelect) return;
+  const val = sourceSelect.value;
+  for (const [selId, cusId] of pairs) {
+    if (selId === sourceId) continue;
+    const other = document.getElementById(selId);
+    const otherCus = document.getElementById(cusId);
+    if (other) other.value = val;
+    if (val === 'custom' && otherCus) {
+      otherCus.style.display = 'block';
+      const srcCus = document.getElementById(sourceId === 'unit-select' ? 'custom-scale' : 'drawer-custom-scale');
+      if (srcCus && otherCus) otherCus.value = srcCus.value;
+    } else if (otherCus) {
+      otherCus.style.display = 'none';
+    }
+  }
+}
+
+setupUnitSelect('unit-select', 'custom-scale', 'scale-hint');
+setupUnitSelect('drawer-unit-select', 'drawer-custom-scale', 'drawer-scale-hint');
+
+function updateScaledDimensions() {
+  if (!originalGeometry) return;
+  const dims = getScaledDimensions();
+  if (!dims) return;
+  showDimensions(new THREE.Vector3(dims.x, dims.y, dims.z));
+}
+
+// Side panel re-run button
+const runCheckBtn = document.getElementById('run-check-btn');
+if (runCheckBtn) runCheckBtn.addEventListener('click', () => { runDesignCheck(); });
+
+// ─── Design Drawer Toggle ─────────────────────────────────────────────
+const drawerToggle = document.getElementById('design-drawer-toggle');
+const drawer = document.getElementById('design-drawer');
+const drawerCloseBtn = document.getElementById('drawer-close-btn');
+
+drawerToggle.addEventListener('click', () => {
+  drawer.style.display = 'block';
+  // Small delay so the CSS transition plays
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      drawer.classList.add('open');
+    });
+  });
+});
+
+drawerCloseBtn.addEventListener('click', () => {
+  drawer.classList.remove('open');
+  setTimeout(() => { drawer.style.display = 'none'; }, 400);
+});
+
+// ─── Boot ────────────────────────────────────────────────────────────
+init();
+
+</script>
+</body>
+</html>
