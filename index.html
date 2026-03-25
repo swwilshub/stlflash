@@ -509,10 +509,34 @@
     </div>
 
     <div class="panel-section" id="design-check-section" style="display:none">
-      <h3>Design Rules Check</h3>
-      <button class="design-check-btn" id="run-check-btn">Run Design Check</button>
+      <h3>BMF S140 Design Rules</h3>
+      <div class="info-box" style="margin-bottom:10px">
+        <table class="check-table" style="margin:0">
+          <thead><tr><th>Rule</th><th>Value</th></tr></thead>
+          <tbody>
+            <tr><td>Max part size</td><td>94 × 52 × 45 mm</td></tr>
+            <tr><td>Min part volume</td><td>1 mm³</td></tr>
+            <tr><td>Min feature size</td><td>50 μm</td></tr>
+            <tr><td>Min hole ⌀ (vert / horiz)</td><td>50 / 150 μm</td></tr>
+            <tr><td>Min wall (supported)</td><td>50 μm</td></tr>
+            <tr><td>Min wall (unsupported)</td><td>100 μm</td></tr>
+            <tr><td>Min overhang angle</td><td>30°</td></tr>
+            <tr><td>Max bridged overhang</td><td>1.5 mm</td></tr>
+            <tr><td>Max unbridged overhang</td><td>0.3 mm</td></tr>
+            <tr><td>Aspect ratio — channels</td><td>100:1</td></tr>
+            <tr><td>Aspect ratio — pins</td><td>40:1</td></tr>
+            <tr><td>Min feature clearance</td><td>100 μm</td></tr>
+            <tr><td>Layer height</td><td>10 – 50 μm</td></tr>
+            <tr><td>Support cone top ⌀</td><td>80 – 200 μm</td></tr>
+            <tr><td>Support cone base ⌀</td><td>0.1 – 1 mm</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Analysis Results</h3>
+      <button class="design-check-btn" id="run-check-btn">Re-run Design Check</button>
       <div id="check-summary" class="check-summary" style="display:none"></div>
-      <div id="check-results"></div>
+      <div id="check-results"><p style="font-size:12px;color:var(--text-dim)">Analyzing…</p></div>
       <div class="overhang-legend" id="overhang-legend" style="display:none">
         <div class="overhang-legend-item">
           <div class="swatch" style="background:#38a169"></div> Safe (&gt;45°)
@@ -748,6 +772,10 @@ function loadSTL(arrayBuffer) {
   baseNormal.set(0, -1, 0);
   setActiveAxisButton('-y');
   rebuildVisualization();
+
+  // Auto-run design check after a small delay to let rendering settle
+  setTimeout(() => { try { runDesignCheck(); } catch(e) { console.error('Design check error:', e); } }, 100);
+
   toast('STL loaded! Select a base direction or click a face.');
 }
 
@@ -1077,6 +1105,7 @@ function onCanvasClick(event) {
 
     clearActiveAxisButtons();
     rebuildVisualization();
+    try { runDesignCheck(); } catch(e) { console.error('Design check error:', e); }
     toast('Base set from clicked face');
   }
 }
@@ -1106,6 +1135,7 @@ document.querySelectorAll('.axis-btn').forEach(btn => {
     baseNormal.copy(map[axis]);
     setActiveAxisButton(axis);
     rebuildVisualization();
+    try { runDesignCheck(); } catch(e) { console.error('Design check error:', e); }
     toast(`Base set to ${btn.textContent.trim()}`);
   });
 });
@@ -1256,13 +1286,17 @@ function estimateMinWallThickness(geometry, numSamples) {
 
   const rc = new THREE.Raycaster();
   const tempGeo = geometry.clone();
+  // Ensure geometry has a valid index for raycasting (non-indexed is fine for STL)
   const tempMesh = new THREE.Mesh(tempGeo, new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));
+  // Must update world matrix for raycaster to work on a detached mesh
+  tempMesh.updateMatrixWorld(true);
 
   let minThickness = Infinity;
   const step = Math.max(1, Math.floor(totalTris / numSamples));
 
   for (let t = 0; t < totalTris; t += step) {
     const i = t * 9;
+    if (i + 8 >= pos.length) break;
     const a = new THREE.Vector3(pos[i], pos[i+1], pos[i+2]);
     const b = new THREE.Vector3(pos[i+3], pos[i+4], pos[i+5]);
     const c = new THREE.Vector3(pos[i+6], pos[i+7], pos[i+8]);
@@ -1270,24 +1304,29 @@ function estimateMinWallThickness(geometry, numSamples) {
     // Centroid
     const centroid = new THREE.Vector3().addVectors(a, b).add(c).divideScalar(3);
 
-    // Face normal
+    // Face normal (compute before normalizing to check for degenerate triangles)
     const ab = new THREE.Vector3().subVectors(b, a);
     const ac = new THREE.Vector3().subVectors(c, a);
-    const normal = new THREE.Vector3().crossVectors(ab, ac).normalize();
-    if (normal.lengthSq() < 0.001) continue;
+    const cross = new THREE.Vector3().crossVectors(ab, ac);
+    if (cross.lengthSq() < 1e-12) continue; // degenerate triangle
+    const normal = cross.normalize();
 
     // Cast ray inward (opposite of face normal)
     const inward = normal.clone().negate();
-    const origin = centroid.clone().addScaledVector(inward, 0.0001); // small offset to avoid self-hit
+    const origin = centroid.clone().addScaledVector(inward, 0.001); // offset to avoid self-hit
     rc.set(origin, inward);
-    rc.far = Infinity;
+    rc.far = 10000;
 
-    const hits = rc.intersectObject(tempMesh);
-    if (hits.length > 0) {
-      const dist = hits[0].distance;
-      if (dist > 0.0001 && dist < minThickness) {
-        minThickness = dist;
+    try {
+      const hits = rc.intersectObject(tempMesh, false);
+      if (hits.length > 0) {
+        const dist = hits[0].distance;
+        if (dist > 0.001 && dist < minThickness) {
+          minThickness = dist;
+        }
       }
+    } catch(e) {
+      // Skip this sample on error
     }
   }
 
@@ -1387,6 +1426,14 @@ function findMinEdgeLength(geometry) {
 function runDesignCheck() {
   if (!originalGeometry) return;
 
+  try { _runDesignCheckInner(); } catch(e) {
+    console.error('Design check failed:', e);
+    document.getElementById('check-results').innerHTML =
+      `<p style="color:#fc8181;font-size:12px">Error during analysis: ${e.message}</p>`;
+  }
+}
+
+function _runDesignCheckInner() {
   const s = getPartScale();
   const dims = getScaledDimensions();
   const R = BMF_RULES;
