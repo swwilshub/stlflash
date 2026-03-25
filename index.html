@@ -426,6 +426,225 @@
     z-index: 5;
     pointer-events: none;
   }
+
+  /* ─── Bottom Drawer: Design Check ─── */
+  #design-drawer-toggle {
+    position: fixed;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 50;
+    background: #2a6b4a;
+    color: #fff;
+    border: 2px solid #38a169;
+    border-bottom: none;
+    border-radius: 10px 10px 0 0;
+    padding: 8px 28px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    letter-spacing: 0.5px;
+    display: none;
+    box-shadow: 0 -2px 16px rgba(56,161,105,0.25);
+    transition: background 0.2s;
+  }
+  #design-drawer-toggle:hover { background: #38a169; }
+  #design-drawer-toggle.has-issues { background: #c53030; border-color: #e53e3e; box-shadow: 0 -2px 16px rgba(229,62,62,0.3); }
+  #design-drawer-toggle.has-issues:hover { background: #e53e3e; }
+
+  #design-drawer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 49;
+    background: var(--panel);
+    border-top: 2px solid #38a169;
+    max-height: 55vh;
+    overflow-y: auto;
+    transform: translateY(100%);
+    transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 -8px 30px rgba(0,0,0,0.5);
+    display: none;
+  }
+  #design-drawer.open {
+    transform: translateY(0);
+  }
+  #design-drawer.has-issues { border-top-color: #e53e3e; }
+
+  .drawer-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 24px;
+    border-bottom: 1px solid var(--accent);
+    position: sticky;
+    top: 0;
+    background: var(--panel);
+    z-index: 1;
+  }
+  .drawer-header h2 {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text);
+  }
+  .drawer-close {
+    background: transparent;
+    border: 1px solid rgba(255,255,255,0.15);
+    color: var(--text-dim);
+    font-size: 18px;
+    padding: 2px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  .drawer-close:hover { color: var(--text); background: rgba(255,255,255,0.08); }
+
+  .drawer-body {
+    padding: 16px 24px 24px;
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+  }
+
+  .drawer-col {
+    flex: 1;
+    min-width: 280px;
+  }
+
+  .drawer-col h3 {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-dim);
+    margin-bottom: 10px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+  }
+
+  .scale-row-drawer {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 12px;
+    padding: 8px 12px;
+    background: rgba(255,255,255,0.04);
+    border-radius: 6px;
+  }
+  .scale-row-drawer label { font-size: 13px; color: var(--text-dim); }
+  .scale-row-drawer select, .scale-row-drawer input {
+    background: var(--accent);
+    color: var(--text);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 4px;
+    padding: 5px 8px;
+    font-size: 13px;
+  }
+  .scale-row-drawer input[type="number"] { width: 80px; }
+
+  .drawer-rules-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  .drawer-rules-table th {
+    text-align: left;
+    padding: 5px 8px;
+    color: var(--text-dim);
+    font-weight: 500;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+  }
+  .drawer-rules-table td {
+    padding: 5px 8px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    color: var(--text-dim);
+  }
+  .drawer-rules-table td:last-child { color: var(--text); font-variant-numeric: tabular-nums; }
+
+  /* Analysis results in drawer */
+  .drawer-check-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  .drawer-check-table th {
+    text-align: left;
+    padding: 6px 8px;
+    color: var(--text-dim);
+    font-weight: 500;
+    font-size: 10px;
+    text-transform: uppercase;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+  }
+  .drawer-check-table td {
+    padding: 6px 8px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    vertical-align: middle;
+  }
+  .drawer-check-table tr.status-pass td:first-child { border-left: 3px solid #38a169; }
+  .drawer-check-table tr.status-warn td:first-child { border-left: 3px solid #d69e2e; }
+  .drawer-check-table tr.status-fail td:first-child { border-left: 3px solid #e53e3e; }
+  .drawer-check-table tr.status-info td:first-child { border-left: 3px solid #4a90d9; }
+  .drawer-check-table tr.status-na td:first-child { border-left: 3px solid #555; }
+
+  .drawer-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+  .drawer-badge-pass { background: rgba(56,161,105,0.2); color: #68d391; }
+  .drawer-badge-warn { background: rgba(214,158,46,0.2); color: #ecc94b; }
+  .drawer-badge-fail { background: rgba(229,62,62,0.2); color: #fc8181; }
+  .drawer-badge-info { background: rgba(74,144,217,0.2); color: #90cdf4; }
+  .drawer-badge-na   { background: rgba(100,100,100,0.2); color: #999; }
+
+  .drawer-summary {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 12px;
+    padding: 10px 14px;
+    background: rgba(255,255,255,0.04);
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .drawer-summary .s-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .drawer-summary .s-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+  }
+
+  .drawer-overhang-legend {
+    display: flex;
+    gap: 12px;
+    margin-top: 12px;
+    padding: 8px 12px;
+    background: rgba(255,255,255,0.04);
+    border-radius: 6px;
+  }
+  .drawer-overhang-legend .ol-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+  .drawer-overhang-legend .ol-swatch {
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+  }
 </style>
 </head>
 <body>
@@ -639,6 +858,73 @@
   </div>
 </div>
 
+<!-- Design Check Toggle Button (fixed to bottom of screen) -->
+<button id="design-drawer-toggle">DESIGN RULES CHECK</button>
+
+<!-- Design Check Drawer -->
+<div id="design-drawer">
+  <div class="drawer-header">
+    <h2>BMF S140 Design Rules Check</h2>
+    <button class="drawer-close" id="drawer-close-btn">&times;</button>
+  </div>
+  <div class="drawer-body">
+
+    <!-- Left column: reference rules + scale -->
+    <div class="drawer-col">
+      <h3>Design Guidelines (Reference)</h3>
+      <div class="scale-row-drawer">
+        <label>Units:</label>
+        <select id="drawer-unit-select">
+          <option value="1" selected>mm</option>
+          <option value="0.001">&mu;m</option>
+          <option value="25.4">inches</option>
+          <option value="custom">Custom</option>
+        </select>
+        <input type="number" id="drawer-custom-scale" value="1" min="0.0001" step="any"
+               style="display:none" placeholder="Scale">
+        <span style="font-size:11px;color:var(--text-dim)" id="drawer-scale-hint"></span>
+      </div>
+      <table class="drawer-rules-table">
+        <thead><tr><th>Design Feature</th><th>Recommended</th></tr></thead>
+        <tbody>
+          <tr><td>Max part size</td><td>94 &times; 52 &times; 45 mm</td></tr>
+          <tr><td>Min part volume</td><td>1 mm&sup3;</td></tr>
+          <tr><td>Min feature size</td><td>50 &mu;m</td></tr>
+          <tr><td>Min hole &oslash; (vertical)</td><td>50 &mu;m</td></tr>
+          <tr><td>Min hole &oslash; (horizontal)</td><td>150 &mu;m</td></tr>
+          <tr><td>Min wall — supported</td><td>50 &mu;m</td></tr>
+          <tr><td>Min wall — unsupported</td><td>100 &mu;m</td></tr>
+          <tr><td>Min overhang angle</td><td>30&deg;</td></tr>
+          <tr><td>Max bridged overhang</td><td>1.5 mm</td></tr>
+          <tr><td>Max unbridged overhang</td><td>0.3 mm</td></tr>
+          <tr><td>Aspect ratio — channels</td><td>100:1</td></tr>
+          <tr><td>Aspect ratio — pins/pillars</td><td>40:1</td></tr>
+          <tr><td>Min feature clearance</td><td>100 &mu;m</td></tr>
+          <tr><td>Part-to-part spacing</td><td>100 &mu;m</td></tr>
+          <tr><td>Layer height</td><td>10 &ndash; 50 &mu;m</td></tr>
+          <tr><td>Support cone top &oslash;</td><td>80 &ndash; 200 &mu;m</td></tr>
+          <tr><td>Support cone base &oslash;</td><td>0.1 &ndash; 1 mm</td></tr>
+          <tr><td>Channel shape &gt; 100 &mu;m</td><td>rectangular or circular</td></tr>
+          <tr><td>Channel shape &lt; 100 &mu;m</td><td>circular</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Right column: analysis results -->
+    <div class="drawer-col">
+      <h3>Your Part Analysis</h3>
+      <div id="drawer-summary" class="drawer-summary" style="display:none"></div>
+      <div id="drawer-results"><p style="color:var(--text-dim);font-size:13px">Load an STL file to see analysis results.</p></div>
+      <div id="drawer-overhang-legend" class="drawer-overhang-legend" style="display:none">
+        <div class="ol-item"><div class="ol-swatch" style="background:#38a169"></div>Safe (&gt;45&deg;)</div>
+        <div class="ol-item"><div class="ol-swatch" style="background:#d69e2e"></div>Marginal (30&ndash;45&deg;)</div>
+        <div class="ol-item"><div class="ol-swatch" style="background:#e53e3e"></div>Overhang (&lt;30&deg;)</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <script type="importmap">
@@ -765,8 +1051,10 @@ function loadSTL(arrayBuffer) {
   const s = getPartScale();
   showDimensions(new THREE.Vector3(size.x * s, size.y * s, size.z * s));
 
-  // Show design check section
+  // Show design check section and drawer toggle
   document.getElementById('design-check-section').style.display = 'block';
+  const toggleBtn = document.getElementById('design-drawer-toggle');
+  if (toggleBtn) { toggleBtn.style.display = 'block'; toggleBtn.textContent = 'DESIGN CHECK: ANALYZING...'; }
 
   // Default base: -Y
   baseNormal.set(0, -1, 0);
@@ -1247,11 +1535,14 @@ let partScale = 1; // multiplier to convert STL units to mm
 let overhangMesh = null; // colored overhang visualization
 
 function getPartScale() {
-  const sel = document.getElementById('unit-select');
+  // Try drawer select first, fall back to side panel select
+  const sel = document.getElementById('drawer-unit-select') || document.getElementById('unit-select');
+  if (!sel) return 1;
   if (sel.value === 'custom') {
-    return parseFloat(document.getElementById('custom-scale').value) || 1;
+    const cus = document.getElementById('drawer-custom-scale') || document.getElementById('custom-scale');
+    return parseFloat(cus?.value) || 1;
   }
-  return parseFloat(sel.value);
+  return parseFloat(sel.value) || 1;
 }
 
 function getScaledDimensions() {
@@ -1598,55 +1889,116 @@ function buildOverhangVisualization(rotatedGeo, colorArray) {
 }
 
 function renderCheckResults(results) {
-  const container = document.getElementById('check-results');
-  const summaryEl = document.getElementById('check-summary');
-
   const counts = { pass: 0, warn: 0, fail: 0, info: 0, na: 0 };
   results.forEach(r => counts[r.status]++);
 
-  summaryEl.style.display = 'flex';
-  summaryEl.innerHTML = `
-    <span class="summary-item"><span class="dot" style="background:#38a169"></span>${counts.pass} pass</span>
-    <span class="summary-item"><span class="dot" style="background:#d69e2e"></span>${counts.warn} warn</span>
-    <span class="summary-item"><span class="dot" style="background:#e53e3e"></span>${counts.fail} fail</span>
-    ${counts.info ? `<span class="summary-item"><span class="dot" style="background:#4a90d9"></span>${counts.info} info</span>` : ''}
+  const hasIssues = counts.fail > 0 || counts.warn > 0;
+
+  // Build summary HTML
+  const summaryHTML = `
+    <span class="s-item"><span class="s-dot" style="background:#38a169"></span>${counts.pass} pass</span>
+    <span class="s-item"><span class="s-dot" style="background:#d69e2e"></span>${counts.warn} warn</span>
+    <span class="s-item"><span class="s-dot" style="background:#e53e3e"></span>${counts.fail} fail</span>
+    ${counts.info ? `<span class="s-item"><span class="s-dot" style="background:#4a90d9"></span>${counts.info} info</span>` : ''}
   `;
 
-  let html = `<table class="check-table">
-    <thead><tr><th>Rule</th><th>Limit</th><th>Measured</th><th>Status</th></tr></thead>
+  // Build table HTML
+  let tableHTML = `<table class="drawer-check-table">
+    <thead><tr><th>Rule</th><th>Limit</th><th>Measured</th><th></th></tr></thead>
     <tbody>`;
-
   for (const r of results) {
-    const badgeClass = `badge-${r.status}`;
-    const statusLabel = r.status === 'na' ? 'N/A' : r.status.toUpperCase();
-    html += `<tr class="status-${r.status}">
+    const label = r.status === 'na' ? 'N/A' : r.status.toUpperCase();
+    tableHTML += `<tr class="status-${r.status}">
       <td>${r.rule}</td>
-      <td>${r.limit}</td>
+      <td style="color:var(--text-dim)">${r.limit}</td>
       <td>${r.measured}</td>
-      <td><span class="badge ${badgeClass}">${statusLabel}</span></td>
+      <td><span class="drawer-badge drawer-badge-${r.status}">${label}</span></td>
     </tr>`;
   }
-  html += '</tbody></table>';
-  container.innerHTML = html;
+  tableHTML += '</tbody></table>';
+
+  // Render into drawer
+  const drawerSummary = document.getElementById('drawer-summary');
+  const drawerResults = document.getElementById('drawer-results');
+  const drawerOvhLegend = document.getElementById('drawer-overhang-legend');
+  if (drawerSummary) { drawerSummary.style.display = 'flex'; drawerSummary.innerHTML = summaryHTML; }
+  if (drawerResults) { drawerResults.innerHTML = tableHTML; }
+  if (drawerOvhLegend) { drawerOvhLegend.style.display = 'flex'; }
+
+  // Also render into side panel if those elements exist
+  const spSummary = document.getElementById('check-summary');
+  const spResults = document.getElementById('check-results');
+  const spOvhLegend = document.getElementById('overhang-legend');
+  if (spSummary) { spSummary.style.display = 'flex'; spSummary.innerHTML = summaryHTML; }
+  if (spResults) { spResults.innerHTML = tableHTML; }
+  if (spOvhLegend) { spOvhLegend.style.display = 'flex'; }
+
+  // Update toggle button
+  const toggle = document.getElementById('design-drawer-toggle');
+  if (toggle) {
+    toggle.style.display = 'block';
+    if (hasIssues) {
+      toggle.classList.add('has-issues');
+      toggle.textContent = `DESIGN CHECK: ${counts.fail} FAIL, ${counts.warn} WARN`;
+    } else {
+      toggle.classList.remove('has-issues');
+      toggle.textContent = `DESIGN CHECK: ALL ${counts.pass} PASSED`;
+    }
+  }
 }
 
 // ─── Scale / Unit Controls ────────────────────────────────────────────
-document.getElementById('unit-select').addEventListener('change', (e) => {
-  const customInput = document.getElementById('custom-scale');
-  const hint = document.getElementById('scale-hint');
-  if (e.target.value === 'custom') {
-    customInput.style.display = 'block';
-    hint.textContent = '× → mm';
-  } else {
-    customInput.style.display = 'none';
-    hint.textContent = '';
+// Wire both the side-panel and drawer unit selects
+function setupUnitSelect(selectId, customId, hintId) {
+  const sel = document.getElementById(selectId);
+  const custom = document.getElementById(customId);
+  const hint = document.getElementById(hintId);
+  if (!sel) return;
+  sel.addEventListener('change', (e) => {
+    if (e.target.value === 'custom') {
+      if (custom) custom.style.display = 'block';
+      if (hint) hint.textContent = '× → mm';
+    } else {
+      if (custom) custom.style.display = 'none';
+      if (hint) hint.textContent = '';
+    }
+    // Sync the other select
+    syncUnitSelects(selectId);
+    updateScaledDimensions();
+  });
+  if (custom) {
+    custom.addEventListener('input', () => {
+      syncUnitSelects(selectId);
+      updateScaledDimensions();
+    });
   }
-  updateScaledDimensions();
-});
+}
 
-document.getElementById('custom-scale').addEventListener('input', () => {
-  updateScaledDimensions();
-});
+function syncUnitSelects(sourceId) {
+  const pairs = [
+    ['unit-select', 'custom-scale'],
+    ['drawer-unit-select', 'drawer-custom-scale'],
+  ];
+  const sourceSelect = document.getElementById(sourceId);
+  if (!sourceSelect) return;
+  const val = sourceSelect.value;
+  for (const [selId, cusId] of pairs) {
+    if (selId === sourceId) continue;
+    const other = document.getElementById(selId);
+    const otherCus = document.getElementById(cusId);
+    if (other) other.value = val;
+    if (val === 'custom' && otherCus) {
+      otherCus.style.display = 'block';
+      const srcCus = document.getElementById(sourceId === 'unit-select' ? 'custom-scale' : 'drawer-custom-scale');
+      if (srcCus && otherCus) otherCus.value = srcCus.value;
+    } else if (otherCus) {
+      otherCus.style.display = 'none';
+    }
+  }
+}
+
+setupUnitSelect('unit-select', 'custom-scale', 'scale-hint');
+setupUnitSelect('drawer-unit-select', 'drawer-custom-scale', 'drawer-scale-hint');
 
 function updateScaledDimensions() {
   if (!originalGeometry) return;
@@ -1655,8 +2007,28 @@ function updateScaledDimensions() {
   showDimensions(new THREE.Vector3(dims.x, dims.y, dims.z));
 }
 
-document.getElementById('run-check-btn').addEventListener('click', () => {
-  runDesignCheck();
+// Side panel re-run button
+const runCheckBtn = document.getElementById('run-check-btn');
+if (runCheckBtn) runCheckBtn.addEventListener('click', () => { runDesignCheck(); });
+
+// ─── Design Drawer Toggle ─────────────────────────────────────────────
+const drawerToggle = document.getElementById('design-drawer-toggle');
+const drawer = document.getElementById('design-drawer');
+const drawerCloseBtn = document.getElementById('drawer-close-btn');
+
+drawerToggle.addEventListener('click', () => {
+  drawer.style.display = 'block';
+  // Small delay so the CSS transition plays
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      drawer.classList.add('open');
+    });
+  });
+});
+
+drawerCloseBtn.addEventListener('click', () => {
+  drawer.classList.remove('open');
+  setTimeout(() => { drawer.style.display = 'none'; }, 400);
 });
 
 // ─── Boot ────────────────────────────────────────────────────────────
