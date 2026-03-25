@@ -761,10 +761,10 @@
           <div class="swatch" style="background:#38a169"></div> Safe (&gt;45°)
         </div>
         <div class="overhang-legend-item">
-          <div class="swatch" style="background:#d69e2e"></div> Marginal (30-45°)
+          <div class="swatch" style="background:#d69e2e"></div> Bridged / marginal
         </div>
         <div class="overhang-legend-item">
-          <div class="swatch" style="background:#e53e3e"></div> Overhang (&lt;30°)
+          <div class="swatch" style="background:#e53e3e"></div> Unsupported (&lt;30°)
         </div>
       </div>
     </div>
@@ -917,8 +917,8 @@
       <div id="drawer-results"><p style="color:var(--text-dim);font-size:13px">Load an STL file to see analysis results.</p></div>
       <div id="drawer-overhang-legend" class="drawer-overhang-legend" style="display:none">
         <div class="ol-item"><div class="ol-swatch" style="background:#38a169"></div>Safe (&gt;45&deg;)</div>
-        <div class="ol-item"><div class="ol-swatch" style="background:#d69e2e"></div>Marginal (30&ndash;45&deg;)</div>
-        <div class="ol-item"><div class="ol-swatch" style="background:#e53e3e"></div>Overhang (&lt;30&deg;)</div>
+        <div class="ol-item"><div class="ol-swatch" style="background:#d69e2e"></div>Bridged / marginal</div>
+        <div class="ol-item"><div class="ol-swatch" style="background:#e53e3e"></div>Unsupported (&lt;30&deg;)</div>
       </div>
     </div>
 
@@ -1626,62 +1626,120 @@ function estimateMinWallThickness(geometry, numSamples) {
 }
 
 // Analyze overhangs — returns per-face angle data and builds colored mesh
-function analyzeOverhangs(geometry, buildDir) {
-  // buildDir points UP (away from platform). Overhangs are faces whose
-  // outward normal has a component pointing downward (opposite to buildDir).
+// Distinguishes bridged overhangs (nearby support within bridgeDist) from
+// truly unsupported overhangs.
+function analyzeOverhangs(geometry, buildDir, bridgeDistMM) {
+  // bridgeDistMM: max distance (in model units) for a face to be considered bridged
   const pos = geometry.getAttribute('position').array;
   const totalTris = pos.length / 9;
   const colors = new Float32Array(pos.length); // 1 color per vertex
 
-  let overhanging30 = 0; // faces below 30° from horizontal
-  let overhanging45 = 0; // faces 30-45° from horizontal
-  let maxOverhangLength = 0;
+  const downDir = buildDir.clone().negate();
 
-  const downDir = buildDir.clone().negate(); // direction toward platform
-
+  // First pass: classify each triangle and compute centroids
+  const faceInfo = new Array(totalTris);
   for (let t = 0; t < totalTris; t++) {
     const i = t * 9;
-    const a = new THREE.Vector3(pos[i], pos[i+1], pos[i+2]);
-    const b = new THREE.Vector3(pos[i+3], pos[i+4], pos[i+5]);
-    const c = new THREE.Vector3(pos[i+6], pos[i+7], pos[i+8]);
+    const ax = pos[i], ay = pos[i+1], az = pos[i+2];
+    const bx = pos[i+3], by = pos[i+4], bz = pos[i+5];
+    const cx = pos[i+6], cy = pos[i+7], cz = pos[i+8];
 
-    const ab = new THREE.Vector3().subVectors(b, a);
-    const ac = new THREE.Vector3().subVectors(c, a);
+    const ab = new THREE.Vector3(bx-ax, by-ay, bz-az);
+    const ac = new THREE.Vector3(cx-ax, cy-ay, cz-az);
     const normal = new THREE.Vector3().crossVectors(ab, ac).normalize();
 
-    // Angle between face normal and downDir
-    // A face pointing straight down has angle = 0° (worst overhang)
-    // A face pointing straight up has angle = 180° (no overhang)
-    // A vertical face has angle = 90°
     const dotDown = normal.dot(downDir);
-    // angleFromDown is the angle between normal and the down vector
-    // If dotDown > 0, the face normal points somewhat downward — this is an overhang
     const angleFromHorizontal = Math.asin(Math.abs(normal.dot(buildDir))) * (180 / Math.PI);
 
-    let r, g, bl;
+    // Centroid projected onto horizontal plane (XZ)
+    const centX = (ax + bx + cx) / 3;
+    const centY = (ay + by + cy) / 3;
+    const centZ = (az + bz + cz) / 3;
+
+    // Classify: 'severe' (<30°), 'marginal' (30-45°), 'safe' (>=45° or upward)
+    let cat = 'safe';
     if (dotDown > 0.01) {
-      // Face normal points downward — it's an overhang
-      if (angleFromHorizontal < 30) {
-        // Severe overhang (< 30° from horizontal)
-        r = 0.9; g = 0.24; bl = 0.24;
-        overhanging30++;
-        // Estimate overhang extent from triangle span projected onto horizontal
-        const triWidth = Math.max(ab.length(), ac.length(), b.distanceTo(c));
-        if (triWidth > maxOverhangLength) maxOverhangLength = triWidth;
-      } else if (angleFromHorizontal < 45) {
-        // Marginal overhang
-        r = 0.84; g = 0.62; bl = 0.18;
-        overhanging45++;
-      } else {
-        // Supported enough
-        r = 0.22; g = 0.63; bl = 0.41;
+      if (angleFromHorizontal < 30) cat = 'severe';
+      else if (angleFromHorizontal < 45) cat = 'marginal';
+    }
+
+    faceInfo[t] = { cat, centX, centY, centZ, idx: i };
+  }
+
+  // Second pass: build a spatial grid of NON-overhanging face centroids (XZ plane)
+  // so we can quickly check if a severe overhang face is near supported geometry
+  const bridgeDist = bridgeDistMM || 1.5; // model-unit distance for bridging
+  const cellSize = bridgeDist;
+  const supportGrid = new Map(); // "gx,gz" -> [{centX, centY, centZ}]
+
+  for (let t = 0; t < totalTris; t++) {
+    const f = faceInfo[t];
+    if (f.cat === 'severe') continue; // only index non-severe faces as potential support
+    const gx = Math.floor(f.centX / cellSize);
+    const gz = Math.floor(f.centZ / cellSize);
+    const key = gx + ',' + gz;
+    if (!supportGrid.has(key)) supportGrid.set(key, []);
+    supportGrid.get(key).push(f);
+  }
+
+  function hasSupportNearby(fx, fy, fz) {
+    const gx = Math.floor(fx / cellSize);
+    const gz = Math.floor(fz / cellSize);
+    const bridgeDist2 = bridgeDist * bridgeDist;
+    // Check 3x3 neighborhood of grid cells
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dz = -1; dz <= 1; dz++) {
+        const key = (gx + dx) + ',' + (gz + dz);
+        const cell = supportGrid.get(key);
+        if (!cell) continue;
+        for (const s of cell) {
+          // 3D distance — a face is bridged if there's support geometry nearby
+          const ddx = s.centX - fx, ddy = s.centY - fy, ddz = s.centZ - fz;
+          if (ddx*ddx + ddy*ddy + ddz*ddz <= bridgeDist2) return true;
+        }
       }
+    }
+    return false;
+  }
+
+  // Third pass: for severe overhangs, check bridging; assign colors
+  let overhangBridged = 0;   // severe overhangs with support nearby (warn)
+  let overhangUnbridged = 0; // severe overhangs with no support nearby (fail)
+  let overhanging45 = 0;
+  let maxOverhangLength = 0;
+
+  for (let t = 0; t < totalTris; t++) {
+    const f = faceInfo[t];
+    const i = f.idx;
+    let r, g, bl;
+
+    if (f.cat === 'severe') {
+      const bridged = hasSupportNearby(f.centX, f.centY, f.centZ);
+      if (bridged) {
+        // Bridged overhang — warning (yellow)
+        r = 0.84; g = 0.62; bl = 0.18;
+        overhangBridged++;
+      } else {
+        // Unbridged overhang — fail (red)
+        r = 0.9; g = 0.24; bl = 0.24;
+        overhangUnbridged++;
+      }
+      // Track max triangle span for overhang extent
+      const ax = pos[i], ay = pos[i+1], az = pos[i+2];
+      const bx = pos[i+3], by = pos[i+4], bz = pos[i+5];
+      const cx = pos[i+6], cy = pos[i+7], cz = pos[i+8];
+      const ab = Math.sqrt((bx-ax)**2 + (by-ay)**2 + (bz-az)**2);
+      const bc = Math.sqrt((cx-bx)**2 + (cy-by)**2 + (cz-bz)**2);
+      const ca = Math.sqrt((ax-cx)**2 + (ay-cy)**2 + (az-cz)**2);
+      const triWidth = Math.max(ab, bc, ca);
+      if (triWidth > maxOverhangLength) maxOverhangLength = triWidth;
+    } else if (f.cat === 'marginal') {
+      r = 0.84; g = 0.62; bl = 0.18;
+      overhanging45++;
     } else {
-      // Not an overhang — face pointing up or sideways
       r = 0.22; g = 0.63; bl = 0.41;
     }
 
-    // Set vertex colors for all 3 vertices of this triangle
     for (let v = 0; v < 3; v++) {
       colors[i + v * 3]     = r;
       colors[i + v * 3 + 1] = g;
@@ -1689,7 +1747,15 @@ function analyzeOverhangs(geometry, buildDir) {
     }
   }
 
-  return { colors, overhanging30, overhanging45, totalTris, maxOverhangLength };
+  return {
+    colors,
+    overhangBridged,
+    overhangUnbridged,
+    overhanging30: overhangBridged + overhangUnbridged, // total severe
+    overhanging45,
+    totalTris,
+    maxOverhangLength,
+  };
 }
 
 // Find minimum edge length in the mesh (proxy for minimum feature size)
@@ -1789,17 +1855,31 @@ function _runDesignCheckInner() {
   const rotatedGeo = originalGeometry.clone();
   rotatedGeo.applyQuaternion(rotQuat);
 
-  const overhangData = analyzeOverhangs(rotatedGeo, buildDir);
-  const ovhPct30 = ((overhangData.overhanging30 / overhangData.totalTris) * 100).toFixed(1);
+  // Bridge distance in model units (convert from mm using scale)
+  const bridgeDistModel = R.maxBridgedOverhang / s;
+  const overhangData = analyzeOverhangs(rotatedGeo, buildDir, bridgeDistModel);
+
+  const ovhBridgedPct = ((overhangData.overhangBridged / overhangData.totalTris) * 100).toFixed(1);
+  const ovhUnbridgedPct = ((overhangData.overhangUnbridged / overhangData.totalTris) * 100).toFixed(1);
   const ovhPct45 = ((overhangData.overhanging45 / overhangData.totalTris) * 100).toFixed(1);
 
+  // Unbridged overhangs — these are true failures (no support within 1.5mm)
   results.push({
-    rule: `Overhangs < ${R.minOverhangAngle}° from horizontal`,
-    limit: `≥ ${R.minOverhangAngle}° recommended`,
-    measured: `${overhangData.overhanging30} faces (${ovhPct30}%)`,
-    status: overhangData.overhanging30 === 0 ? 'pass' : (parseFloat(ovhPct30) < 5 ? 'warn' : 'fail'),
+    rule: `Unsupported overhangs < ${R.minOverhangAngle}°`,
+    limit: `≥ ${R.minOverhangAngle}° (no support within ${R.maxBridgedOverhang} mm)`,
+    measured: `${overhangData.overhangUnbridged} faces (${ovhUnbridgedPct}%)`,
+    status: overhangData.overhangUnbridged === 0 ? 'pass' : 'fail',
   });
 
+  // Bridged overhangs — warnings (connected geometry within 1.5mm)
+  results.push({
+    rule: `Bridged overhangs < ${R.minOverhangAngle}°`,
+    limit: `Support within ${R.maxBridgedOverhang} mm — printable with care`,
+    measured: `${overhangData.overhangBridged} faces (${ovhBridgedPct}%)`,
+    status: overhangData.overhangBridged === 0 ? 'pass' : 'warn',
+  });
+
+  // Marginal overhangs (30-45°)
   results.push({
     rule: 'Marginal overhangs (30°–45°)',
     limit: 'May need supports',
@@ -1807,12 +1887,12 @@ function _runDesignCheckInner() {
     status: overhangData.overhanging45 === 0 ? 'pass' : 'info',
   });
 
-  // 6. Max overhang span estimate
+  // Max overhang span estimate
   const maxOvhSpan = overhangData.maxOverhangLength * s;
   if (overhangData.overhanging30 > 0) {
     results.push({
       rule: 'Est. max overhang span',
-      limit: `≤ ${R.maxUnbridgedOverhang} mm (unsupported) / ${R.maxBridgedOverhang} mm (bridged)`,
+      limit: `≤ ${R.maxUnbridgedOverhang} mm unbridged / ${R.maxBridgedOverhang} mm bridged`,
       measured: `~${maxOvhSpan.toFixed(3)} mm`,
       status: maxOvhSpan <= R.maxUnbridgedOverhang ? 'pass' :
               (maxOvhSpan <= R.maxBridgedOverhang ? 'warn' : 'fail'),
